@@ -1,8 +1,8 @@
-# RootPulse backend — API + scheduler image (docs/plan/01-tech-stack.md, 05-testing-deployment-devex.md)
-# Same image, different entrypoint command per Fly.io process group:
-#   api:       gunicorn config.wsgi
-#   scheduler: python manage.py run_scheduler
-#   notifier:  python manage.py run_notifications
+# RootPulse backend — API image, deployed on Render (docs/plan/01-tech-stack.md).
+# The scheduler and notification dispatcher are NOT long-running processes
+# here (Render's free tier has no always-on worker) — they're Django
+# management commands invoked via a signed internal HTTP endpoint on a
+# GitHub Actions cron schedule instead (Phase 6/8, docs/plan/06-roadmap.md).
 
 FROM python:3.12-slim
 

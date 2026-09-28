@@ -5,6 +5,7 @@ djangorestframework-simplejwt
 django-cors-headers
 argon2-cffi
 psycopg[binary]
+dj-database-url
 python-dotenv
 httpx
 gunicorn

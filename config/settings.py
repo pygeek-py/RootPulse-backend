@@ -10,6 +10,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+import dj_database_url
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -87,19 +88,29 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 
-# Database — Postgres everywhere (docs/plan/01-tech-stack.md); local dev
-# points at the docker-compose Postgres service by default.
+# Database — Postgres everywhere (docs/plan/01-tech-stack.md). DATABASE_URL
+# (set by Neon, and by Render at deploy time) takes priority; local dev
+# without it falls back to the docker-compose Postgres service.
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME", "rootpulse"),
-        "USER": os.environ.get("DB_USER", "rootpulse"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", "rootpulse"),
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
+if os.environ.get("DATABASE_URL"):
+    DATABASES = {
+        "default": dj_database_url.parse(
+            os.environ["DATABASE_URL"],
+            conn_max_age=600,
+            ssl_require=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("DB_NAME", "rootpulse"),
+            "USER": os.environ.get("DB_USER", "rootpulse"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", "rootpulse"),
+            "HOST": os.environ.get("DB_HOST", "localhost"),
+            "PORT": os.environ.get("DB_PORT", "5432"),
+        }
+    }
 
 
 # Custom user model — set before the first migration, never retrofitted.

@@ -13,14 +13,16 @@
 | Objective | Both repos scaffolded, CI green on an empty app, every free-tier account provisioned |
 | Frontend | `create-next-app` (TS, App Router, Tailwind), ESLint/Prettier, Vitest + Playwright configs, shadcn/ui installed |
 | Backend | `django-admin startproject`, DRF + drf-spectacular installed, custom user model in place from commit 1, pytest-django configured |
-| Database | Neon project created (dev + a staging branch) |
-| Infra | Fly.io apps created (API, 2 probers) but deploying a placeholder; Vercel project linked; GitHub Actions workflows for lint/test; Sentry projects created |
+| Database | **Neon project created and migrated (done)** |
+| Infra | Render web service created (Docker deploy, `render.yaml` + `Dockerfile` ready); Vercel project linked; GitHub Actions workflows for lint/test (done for both repos); Sentry projects created |
 | Dependencies | None — this is the starting point |
 | Testing | CI pipeline itself is the test: a trivial passing test on each side, gating merges |
 | Definition of done | `git push` to `main` on either repo triggers a green CI run and a successful (empty) deploy to staging |
 | Complexity | Low | | Risk | Free-tier account setup friction (verification steps, etc.) — annoying, not hard |
 
-**Checkpoint:** an empty Next.js page is live on Vercel; an empty Django health-check endpoint is live on Fly.io; nothing else exists yet.
+**Checkpoint:** an empty Next.js page is live on Vercel; an empty Django health-check endpoint is live on Render; nothing else exists yet.
+
+**Status as of this plan's last update:** frontend and backend scaffolding done and committed locally; Neon database provisioned and migrated (custom user model confirmed live). Still needed: Render/Vercel/Sentry/Resend accounts and the actual remote GitHub repos + pushes (see the backend README's "What needs you" table).
 
 ---
 
@@ -120,13 +122,13 @@
 | --- | --- |
 | Objective | Monitors actually get checked, from multiple regions, and results are recorded |
 | Frontend | Monitor detail page shows real check history, current status, response-time chart |
-| Backend | `run_scheduler` management command, `ThreadPoolExecutor` dispatch, `httpx`-based execution per monitor type (`03-monitoring-engine.md` §13), the 2 regional prober FastAPI services, `/internal/probe` |
+| Backend | `run_scheduler_once`/`run_notifications_once` management commands, the signed `/internal/run-due-checks` endpoint that invokes them, `ThreadPoolExecutor` dispatch, `httpx`-based execution per monitor type (`03-monitoring-engine.md` §13), the 2 Cloudflare Worker probers, `/internal/probe` |
 | Database | `Check` model + indexes |
-| Infra | Prober services deployed to their Fly.io regions; scheduler running as an always-on process |
+| Infra | 2 Cloudflare Workers deployed (regional probers); the GitHub Actions scheduled workflow that calls `/internal/run-due-checks` every 5 minutes (also keeps the Render free service from sleeping) |
 | Dependencies | Phase 5 |
 | Testing | The concurrency/double-claim test, per-type execution tests, timeout handling, prober round-trip test |
 | Definition of done | A real monitor against a real target produces real `Check` rows on schedule, from 3 regions where applicable, with correct timing breakdown |
-| Complexity | Very High — this is the technical core of the product | Risk | Ping monitors need raw-socket capability in the container (`CAP_NET_RAW`) — a real Fly.io deployment config detail to get right, not just app code |
+| Complexity | Very High — this is the technical core of the product | Risk | "Ping" is TCP-connect, not ICMP (`03-monitoring-engine.md` §13 note) since neither Render nor Cloudflare Workers expose raw sockets — a platform constraint to design around, not a deployment detail to fix |
 
 **Checkpoint:** watch a monitor go from "pending" to "up" with real response-time data appearing within minutes of creation.
 
@@ -252,7 +254,7 @@
 | Dependencies | Phase 7, Phase 12 |
 | Testing | Generated file correctness (parse the PDF/CSV back and assert content matches source data) |
 | Definition of done | A downloaded PDF/CSV accurately reflects the selected date range |
-| Complexity | Low-Medium | Risk | PDF rendering libraries can be finicky about fonts/layout in a server environment — test in the actual Fly.io container, not just locally |
+| Complexity | Low-Medium | Risk | PDF rendering libraries can be finicky about fonts/layout in a server environment — test in the actual Render deployment container, not just locally |
 
 **Checkpoint:** export a real month of incident data and confirm the numbers match the dashboard.
 
@@ -302,7 +304,7 @@
 | Frontend | Review for any lingering `dangerouslySetInnerHTML` or unescaped user content |
 | Backend | Full SSRF test suite run against the real prober deployment (not just mocks), rate-limit tuning based on real usage patterns, dependency vulnerability scan |
 | Database | Review indexes added for every `user_id`-scoped query (permission-boundary correctness depends on these existing) |
-| Infra | Fly.io network isolation for probers verified for real, not just configured; Sentry alerting on anomalous error rates |
+| Infra | Cloudflare Worker prober isolation confirmed (they hold no credentials for and have no path to the backend's database or internal services); Sentry alerting on anomalous error rates |
 | Dependencies | Effectively all prior phases |
 | Testing | Every scenario in `05-testing-deployment-devex.md` §Critical scenarios re-run explicitly as a gate, plus the `security-review` process on the final diff before production |
 | Definition of done | The SSRF defenses in `04-security.md` are verified against real attempted targets (a real internal address, a real DNS-rebinding domain set up for the test) in the staging environment |
@@ -336,13 +338,13 @@
 | --- | --- |
 | Objective | Go live |
 | Frontend | Production Vercel deploy, custom domain, analytics/error tracking confirmed live |
-| Backend | Production Fly.io deploy (API + scheduler + 2 probers), production Neon database, production secrets rotated (never reuse staging secrets) |
+| Backend | Production Render deploy (API + triggered scheduler/notifier endpoints), production Cloudflare Worker probers, production Neon database, production secrets rotated (never reuse staging secrets) |
 | Database | Production migrations run, seed data (curated providers) loaded |
-| Infra | DNS cutover, SSL confirmed, the external "who watches the watcher" check pointed at production |
+| Infra | DNS cutover, SSL confirmed, the production GitHub Actions cron trigger enabled, the external "who watches the watcher" check pointed at production |
 | Dependencies | Phase 17 |
 | Testing | Smoke test suite run against production immediately post-deploy |
 | Definition of done | A real monitor, created by the real product owner, on the real product, checking a real site, alerting through a real channel |
-| Complexity | Medium (mechanically) | Risk | First-real-traffic surprises are normal — have the rollback plan (previous Fly.io release, previous Vercel deployment) ready before cutover, not improvised during it |
+| Complexity | Medium (mechanically) | Risk | First-real-traffic surprises are normal — have the rollback plan (previous Render deploy, previous Vercel deployment) ready before cutover, not improvised during it |
 
 **Checkpoint:** RootPulse is monitoring itself, in production, for real.
 

@@ -21,8 +21,8 @@ Every queryset in every DRF view is filtered by `request.user` — there is no c
 ## 4. Secrets
 
 - Never committed — `.env` files are gitignored from Phase 0 onward, with `.env.example` committed instead.
-- Local dev: `.env` file. Production: Fly.io secrets (`flyctl secrets set`) and Vercel environment variables. CI: GitHub Actions encrypted secrets.
-- The shared HMAC secret used between the scheduler and the regional probers (`01-tech-stack.md`) is treated with the same rigor as a database credential.
+- Local dev: `.env` file. Production: Render environment variables (set via `render.yaml`'s `sync: false` entries or the dashboard, never committed) and Vercel environment variables. CI: GitHub Actions encrypted secrets — including the one that lets the scheduler-trigger workflow call the signed internal endpoint.
+- The shared HMAC secret used between the scheduler and the Cloudflare Worker probers (`01-tech-stack.md`) is treated with the same rigor as a database credential.
 
 ## 5. Encryption
 
@@ -51,7 +51,7 @@ The API is token-based for all state-changing requests (`Authorization: Bearer`)
 
 ## 9. SSRF protection — the critical one
 
-**The threat:** every monitor type except DNS accepts a user-supplied host/URL, and the backend's job is to make outbound network requests to it. Without defenses, a user (or an attacker who compromises a user's account, or simply any user acting maliciously) could point a monitor at `http://169.254.169.254/latest/meta-data/` (cloud metadata endpoint), `http://localhost:5432` (the database, if reachable), or an internal Fly.io private-network address, and use RootPulse's own infrastructure as a proxy into networks it should never be able to reach.
+**The threat:** every monitor type except DNS accepts a user-supplied host/URL, and the backend's job is to make outbound network requests to it. Without defenses, a user (or an attacker who compromises a user's account, or simply any user acting maliciously) could point a monitor at `http://169.254.169.254/latest/meta-data/` (cloud metadata endpoint — relevant on Render too, not just Fly.io), `http://localhost:5432` (the database, if it were reachable from the API container, which it deliberately isn't over the public internet), or a Render internal-networking address, and use RootPulse's own infrastructure as a proxy into networks it should never be able to reach.
 
 **Defense, layered:**
 
@@ -60,11 +60,11 @@ The API is token-based for all state-changing requests (`Authorization: Bearer`)
 3. **DNS rebinding defense (the part that's easy to get wrong):** validating at creation time is not enough — a domain can resolve to a safe IP during validation and be repointed at an internal IP by the time the check actually runs (a classic TOCTOU gap). The fix: resolve once immediately before connecting, validate that specific IP, and **connect directly to the validated IP** (setting the `Host` header for virtual hosting) rather than letting the HTTP client re-resolve the hostname itself — this closes the window between validation and use to effectively zero.
 4. **Validate redirect targets, not just the original URL.** If `follow_redirects` is enabled for an HTTP monitor, each redirect hop is independently resolved and validated before being followed — an attacker-controlled server could otherwise return a 302 to an internal address after passing initial validation.
 5. **Scheme allowlist.** HTTP(S) monitors only ever use `http://`/`https://` — no `file://`, `gopher://`, `dict://`, etc.
-6. **Network-level defense in depth, not just application logic.** The prober processes run with no network route to the backend's own database or internal services (Fly.io private networking is scoped so probers can reach the public internet and the scheduler's callback endpoint, and nothing else) — so even a bug in the application-level filter above doesn't expose internal infrastructure.
+6. **Network-level defense in depth, not just application logic.** The Cloudflare Worker probers have no credentials for and no network path to the backend's database or any internal service at all — they only ever make one outbound request (to the monitored target) and one inbound response (back to the signed caller). There's no private network to misconfigure here, which is a stronger guarantee than "scoped" private networking would have been.
 7. **Blast-radius limits regardless.** Short timeouts (§`03-monitoring-engine.md` §4) and a response-body size cap prevent a successful SSRF from being used for large data exfiltration or as a sustained tunnel even in a worst case.
 8. **Applies to Ping and Port monitors too**, even though they're not URL-based — the target host is resolved and validated the same way before an ICMP echo or TCP connect is attempted.
 
-This entire flow lives in one shared module (`monitoring/target_validation.py`), called from both the monitor-creation serializer (fail fast with a clear error) and the check-execution path (fail the check silently as a validation error, never as a false "down" incident) — one implementation, not two that can drift out of sync.
+On the Django side, this entire flow lives in one shared module (`monitoring/target_validation.py`), called from both the monitor-creation serializer (fail fast with a clear error) and the primary check-execution path (fail the check silently as a validation error, never as a false "down" incident). **The Cloudflare Worker probers need the same algorithm too** — they're the ones actually opening the connection for 2 of the 3 confirming regions, so a Worker that skipped validation would itself be an SSRF vector (and likely get the whole account flagged for abuse by Cloudflare, independent of any harm to RootPulse itself). Since Workers run JS, not Python, this is a second implementation of the same 8-point algorithm above, not a shared import — mitigated by testing both against one identical fixture list (known-bad IPs/redirect chains) in CI, so a fix to one side's test suite catches drift in the other.
 
 ## 10. Input validation
 

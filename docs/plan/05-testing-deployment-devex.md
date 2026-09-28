@@ -50,18 +50,23 @@
         Local dev            CI (GitHub Actions)         Production
    ┌──────────────────┐   ┌────────────────────┐   ┌────────────────────────┐
    │ Next.js dev server│   │ lint + typecheck    │   │ Vercel (frontend)       │
-   │ Django runserver  │   │ + pytest + vitest   │   │ Fly.io (API + scheduler │
-   │ local Postgres    │   │ + Playwright        │   │  + 2 regional probers)  │
-   │ (docker-compose)  │──►│ (against a service- │──►│ Neon (Postgres)         │
-   └──────────────────┘   │  container Postgres) │   │ Resend (email)          │
-                           └────────────────────┘   │ Sentry (errors)         │
+   │ Django runserver  │   │ + pytest + vitest   │   │ Render (API, free web   │
+   │ local Postgres    │   │ + Playwright        │   │  service)               │
+   │ (docker-compose)  │──►│ (against a service- │──►│ Cloudflare Workers      │
+   └──────────────────┘   │  container Postgres) │   │  (2 regional probers)  │
+                           └────────────────────┘   │ Neon (Postgres)         │
+                                                     │ GitHub Actions cron     │
+                                                     │  (scheduler trigger +   │
+                                                     │  keep-alive, every 5m)  │
+                                                     │ Resend (email)          │
+                                                     │ Sentry (errors)         │
                                                      └────────────────────────┘
 ```
 
-- **Environments:** local → CI (ephemeral, per-PR) → staging (a second Fly.io app + Neon branch, mirrors production config) → production. Staging exists specifically so the monitoring engine can be exercised against real external targets without touching production data or alerting a real user.
-- **Migrations:** Django's own migration system, run as a release step (`flyctl deploy` with a release command running `manage.py migrate`) before the new backend version starts serving traffic.
+- **Environments:** local → CI (ephemeral, per-PR) → staging (a second Render service + Neon branch, mirrors production config, its own GitHub Actions cron trigger on a separate schedule) → production. Staging exists specifically so the monitoring engine can be exercised against real external targets without touching production data or alerting a real user.
+- **Migrations:** Django's own migration system, run as a Render "pre-deploy" / release-phase command (`python manage.py migrate`) before the new backend version starts serving traffic.
 - **Backups:** Neon's built-in point-in-time recovery (part of its free tier) — not a separately built backup system.
-- **Monitoring the monitor:** an external free check against RootPulse's own `/health` endpoint (`01-tech-stack.md`), plus Sentry for error tracking and Fly.io's logs for scheduler/notification-dispatcher health.
+- **Monitoring the monitor:** an external free check against RootPulse's own `/health` endpoint (`01-tech-stack.md`), plus Sentry for error tracking, Render's dashboard logs, and the GitHub Actions workflow run history itself (a run that stops firing is as much a signal as an error would be).
 
 ## 3. Development environment
 
@@ -76,8 +81,9 @@ python manage.py migrate
 python manage.py createsuperuser
 python manage.py loaddata seed_providers   # curated ~15–20 dependency providers
 python manage.py runserver                 # API on :8000
-python manage.py run_scheduler              # separate terminal — the check scheduler
-python manage.py run_notifications          # separate terminal — the notification dispatcher
+python manage.py run_scheduler_once         # separate terminal, run manually/on a
+python manage.py run_notifications_once     # loop — no persistent process locally either,
+                                             # matching the triggered-pass production model
 
 # Frontend
 cd RootPulse-frontend
@@ -87,7 +93,7 @@ npm run generate-api-client     # regenerates the typed client from the backend'
 npm run dev                     # Next.js on :3000
 ```
 
-A `docker-compose.yml` in the backend repo provides local Postgres only — the app processes themselves run natively (faster iteration than containerizing everything for local dev), with Docker reserved for the actual Fly.io deployment images.
+A `docker-compose.yml` in the backend repo provides local Postgres only — the app processes themselves run natively (faster iteration than containerizing everything for local dev), with Docker reserved for the actual Render deployment image (`Dockerfile`).
 
 ## 4. Git & branching strategy
 

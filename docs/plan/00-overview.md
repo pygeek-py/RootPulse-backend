@@ -33,28 +33,29 @@ Both repos need `git init`, license/README, and a full toolchain from scratch (P
                          └───────────┬─────────────┘
                                      │ REST (typed via OpenAPI)
                                      ▼
-                         ┌────────────────────────┐
-                         │  Backend API             │
-                         │  Django + DRF (Fly.io)   │
-                         └───────────┬─────────────┘
+   GitHub Actions        ┌────────────────────────┐
+   cron (every 5 min) ──►│  Backend API             │
+   triggers a scheduler  │  Django + DRF (Render,   │
+   pass AND keeps the    │  free Web Service)       │
+   free service awake    └───────────┬─────────────┘
                      ┌───────────────┼────────────────────┐
                      ▼               ▼                    ▼
            ┌──────────────┐ ┌────────────────┐  ┌──────────────────┐
            │  Postgres     │ │  Scheduler      │  │  Notification     │
-           │  (Neon)       │ │  management     │  │  dispatcher        │
-           │  — monitors,  │ │  command (claims │  │  management        │
-           │  checks,      │ │  due monitors    │  │  command (claims   │
-           │  incidents…   │ │  via Django's    │  │  due sends via     │
-           └──────────────┘ │  skip_locked)    │  │  skip_locked)      │
+           │  (Neon)       │ │  pass (one-shot │  │  dispatcher pass   │
+           │  — monitors,  │ │  mgmt command,  │  │  (one-shot mgmt    │
+           │  checks,      │ │  claims due     │  │  command, claims   │
+           │  incidents…   │ │  monitors via   │  │  due sends via     │
+           └──────────────┘ │  skip_locked)   │  │  skip_locked)      │
                              └───────┬─────────┘  └─────────┬──────────┘
                                      │ HTTP (signed)         ▼
                          ┌───────────┴─────────┐   Email / Slack / Discord /
                          ▼                      ▼   Telegram / Webhook / Push
                  ┌───────────────┐    ┌───────────────┐
-                 │ Prober         │    │ Prober         │   (2 more regions,
-                 │ region A       │    │ region B       │    tiny stateless
-                 │ (Fly.io,       │    │ (Fly.io,       │    Python/FastAPI
-                 │  FastAPI)      │    │  FastAPI)      │    check executor)
+                 │ Prober         │    │ Prober         │   (2–3 regions,
+                 │ region A       │    │ region B       │    Cloudflare
+                 │ (Cloudflare    │    │ (Cloudflare    │    Workers — no
+                 │  Worker)       │    │  Worker)       │    sleep/cold-start)
                  └───────┬────────┘    └───────┬────────┘
                          ▼                      ▼
                 External websites / APIs / servers / ports / DNS / heartbeats
@@ -65,8 +66,9 @@ Both repos need `git init`, license/README, and a full toolchain from scratch (P
 ```
 Monitor created (any of 8 types)
         ↓
-Scheduler polls `monitors` table for next_check_at <= now(), claims rows
-(SELECT … FOR UPDATE SKIP LOCKED — no external queue needed at MVP scale)
+GitHub Actions cron (every 5 min) calls the signed /internal/run-due-checks
+endpoint, which claims due rows from `monitors` (next_check_at <= now())
+via SELECT … FOR UPDATE SKIP LOCKED — no external queue needed at MVP scale
         ↓
 Primary region executes the check directly; for HTTP(S)/Ping/Port monitors,
 2 additional regions are also asked to check (multi-location confirmation)

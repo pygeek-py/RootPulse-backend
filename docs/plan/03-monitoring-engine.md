@@ -4,11 +4,11 @@ This is the core of the product — everything else (dashboard, alerts, status p
 
 ## 1. Scheduler
 
-A Django management command, `run_scheduler`, run as an always-on process (Fly.io, restarted by the platform on crash).
+Render's free tier has no always-on worker (`01-tech-stack.md`), so the scheduler is a **single-pass** Django management command (`run_scheduler_once`) invoked via a signed internal endpoint (`POST /internal/run-due-checks`) that a GitHub Actions cron workflow calls every 5 minutes — not a persistent loop.
 
 ```python
-# conceptual, not final code
-while True:
+# conceptual, not final code — one invocation, not a loop
+def run_scheduler_once():
     with transaction.atomic():
         due = (Monitor.objects
                .select_for_update(skip_locked=True)
@@ -20,20 +20,20 @@ while True:
             monitor.next_check_at = now() + monitor.interval_seconds  # claim immediately
             monitor.save(update_fields=["next_check_at"])
     dispatch_to_thread_pool(due)   # outside the transaction — network calls never hold a DB lock
-    sleep(POLL_INTERVAL_SECONDS)   # e.g. 1s
+    # function returns; the HTTP request/response cycle ends here
 ```
 
-`skip_locked=True` means a second scheduler process (if ever run for redundancy) never double-claims the same monitor — this is what makes the design safely horizontally scalable later without a rewrite.
+`skip_locked=True` means an overlapping invocation (e.g. a retried trigger) never double-claims the same monitor — the same property that would make this safely horizontally scalable if it ever became a persistent process again (e.g. after moving off Render's free tier).
 
 ## 2. Workers & queue
 
-No external queue. The `monitors` table *is* the queue; `next_check_at` is the priority field. Dispatch to a bounded `ThreadPoolExecutor` (default 20 workers) inside the scheduler process — each thread runs one check synchronously via `httpx`, writes its `Check` row, and evaluates failure/recovery logic before returning to the pool.
+No external queue. The `monitors` table *is* the queue; `next_check_at` is the priority field. Dispatch to a bounded `ThreadPoolExecutor` (default 20 workers) inside the triggered request — each thread runs one check synchronously via `httpx`, writes its `Check` row, and evaluates failure/recovery logic before the request returns.
 
 ## 3. Concurrency
 
-- Global cap: the thread pool size (config value, tunable per Fly.io VM's CPU/memory).
+- Global cap: the thread pool size (config value, tunable for Render's free-instance CPU/memory), plus the request-timeout ceiling GitHub Actions/Render allow for one HTTP call — `BATCH_SIZE` (§1) is sized so one pass comfortably finishes within that window even at the monitor counts this plan targets.
 - Per-monitor: irrelevant — a monitor is only ever "in flight" once, since `next_check_at` is claimed atomically before dispatch.
-- No single monitor or check type can starve others: the claim query is FIFO by `next_check_at`, and batch size is capped per poll cycle.
+- No single monitor or check type can starve others: the claim query is FIFO by `next_check_at`, and batch size is capped per pass.
 
 ## 4. Timeouts
 
@@ -42,11 +42,11 @@ Configurable per monitor (`config.timeout_seconds`, default 30s, PRD §6.1 advan
 ## 5. Retries (within one check cycle vs. across incidents — two different things)
 
 - **Within one check attempt:** no automatic retry — a slow/flaky single request is exactly what multi-location confirmation (below) exists to filter out, not per-request retries that would just delay detection.
-- **Notification delivery retries:** `NotificationDelivery.attempt_count` with exponential backoff (1m, 5m, 15m, capped), claimed by the same `skip_locked` pattern via `run_notifications`.
+- **Notification delivery retries:** `NotificationDelivery.attempt_count` with exponential backoff (1m, 5m, 15m, capped), claimed by the same `skip_locked` pattern via `run_notifications_once` (same triggered-pass model as the scheduler, §1).
 
 ## 6. Locations (multi-location checks)
 
-For HTTP(S), Keyword, Ping, and Port monitors: the primary scheduler always checks directly; it also calls the 2 regional prober services (tiny FastAPI apps, see `01-tech-stack.md`) over signed HTTP. A failure only becomes a candidate incident if **at least 2 of 3 regions agree** it's down. SSL, Domain, Cron/Heartbeat, and DNS monitors don't benefit from geographic diversity the same way (a cert either is or isn't expiring; a heartbeat either arrived or didn't) — for those, "confirmation" means a same-region recheck after a short delay instead.
+For HTTP(S), Keyword, Ping, and Port monitors: the primary check runs from Render (wherever the API instance's region is); the same triggered pass also calls 2 Cloudflare Worker probers (`01-tech-stack.md`) in different regions over signed HTTP. A failure only becomes a candidate incident if **at least 2 of 3 regions agree** it's down. SSL, Domain, Cron/Heartbeat, and DNS monitors don't benefit from geographic diversity the same way (a cert either is or isn't expiring; a heartbeat either arrived or didn't) — for those, "confirmation" means a same-region recheck after a short delay instead.
 
 ## 7. Check results — what gets stored
 
@@ -100,14 +100,15 @@ or a provider's subscribed contacts, or a status-page's subscriber list)
         ↓
 NotificationDelivery rows created (one per contact per event), status=pending
         ↓
-run_notifications claims due rows (skip_locked, same pattern as §1)
+run_notifications_once claims due rows (skip_locked, same pattern as §1),
+triggered by the same GitHub Actions cron pass right after run_scheduler_once
         ↓
 Channel adapter (Email via Resend / Slack / Discord / Telegram / generic
 Webhook / Web push) sends; on failure, backoff + retry (§5); on final
 failure after max attempts, status=failed and surfaced in the dashboard
         ↓
-Recurring: while Incident.ended_at IS NULL, run_notifications also creates
-new pending deliveries on each contact's configured repeat_interval_seconds
+Recurring: while Incident.ended_at IS NULL, each pass also creates new
+pending deliveries once a contact's configured repeat_interval_seconds elapses
 ```
 
 | Channel | Adapter approach |
@@ -124,16 +125,18 @@ new pending deliveries on each contact's configured repeat_interval_seconds
 | --- | --- | --- | --- | --- |
 | HTTP(S) | `method`, `headers`, `expected_status`, `timeout_seconds`, `follow_redirects` | `httpx` request, capture full timing breakdown | Non-matching status, timeout, connection error | Full root-cause breakdown applies |
 | Keyword | above + `keyword`, `exists` (bool) | Same request, scan response body | Keyword condition not met (even on 200 OK) | Root-cause breakdown still applies (it's still an HTTP request) |
-| Ping | `packet_count` | ICMP echo (raw socket — needs `CAP_NET_RAW` in the container, noted in deployment) | No response within timeout | No timing breakdown (not HTTP) |
+| Ping | `port` (default 80/443) | **TCP connect, not ICMP echo** — see the note below | Connection refused or timeout | No timing breakdown |
 | Port | `port` | TCP connect | Refused / timeout | No timing breakdown |
 | SSL certificate | `warn_days` | TLS handshake, read cert `notAfter` | Days remaining < `warn_days`, or chain invalid | No "incident that recovers" in the usual sense — it's a standing warning until the cert is renewed |
 | Domain expiration | `warn_days` | WHOIS/RDAP lookup | Days remaining < `warn_days` | Checked far less often (e.g. daily) — no need for 5-minute polling on a value that changes yearly |
 | Cron / Heartbeat | `grace_period_seconds` | **Inverted** — no outbound check; a unique ingest URL (`/api/v1/heartbeat/{token}`) is pinged by the user's job. Scheduler just checks "was the last ping within interval + grace period?" | No ping received in time | `started_at` reasoning is "expected but missing," not a failed request |
 | DNS | `record_types` (A/AAAA/CNAME/MX/TXT/NS) | Resolve, diff vs. last-known snapshot stored on the monitor | Unexpected change from the last-known-good snapshot | First-ever check establishes the baseline, doesn't alert |
 
+**Note on "Ping":** true ICMP echo needs a raw socket, which neither Render's containers nor Cloudflare Workers expose (a routine restriction on multi-tenant/serverless platforms, not an oversight) — so "Ping" is implemented as a TCP connect to a configurable port (default 80/443), consistent with how several real-world uptime tools handle the same platform restriction. This is stated plainly in the product's own docs/status pages rather than implied to be literal ICMP.
+
 ## 14. Analytics — aggregation strategy
 
-Raw `Check` rows are never queried directly for anything beyond the last 24–48 hours of a single monitor's detail page. Everything else reads from pre-aggregated rollups, computed by a scheduled Django management command (`run_rollups`, hourly):
+Raw `Check` rows are never queried directly for anything beyond the last 24–48 hours of a single monitor's detail page. Everything else reads from pre-aggregated rollups, computed by `run_rollups_once` — another single-pass management command, triggered hourly by its own GitHub Actions cron entry (separate from the 5-minute scheduler/notification trigger):
 
 | Table | Grain | Computed from | Used by |
 | --- | --- | --- | --- |
