@@ -1,0 +1,28 @@
+# Placeholder — not yet deployed. Rename `app` once the real Fly.io app is
+# created (`fly apps create rootpulse-api`, requires a Fly.io account, see
+# docs/plan/README.md "what needs you" note). Two more, near-identical
+# fly.toml files (fly.prober-a.toml, fly.prober-b.toml) are added in
+# Phase 6 for the two regional prober services — this one is the primary
+# API + scheduler app.
+
+app = "rootpulse-api"
+primary_region = "iad"
+
+[build]
+
+[env]
+  DJANGO_DEBUG = "false"
+  DJANGO_ALLOWED_HOSTS = "rootpulse-api.fly.dev"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = false   # scheduler must stay up — see docs/plan/01-tech-stack.md
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  path = "/health/"
+  interval = "15s"
+  timeout = "5s"
+  grace_period = "10s"

@@ -1,0 +1,19 @@
+Django>=5.1,<5.2
+djangorestframework
+drf-spectacular
+djangorestframework-simplejwt
+django-cors-headers
+argon2-cffi
+psycopg[binary]
+python-dotenv
+httpx
+gunicorn
+
+# Testing
+pytest
+pytest-django
+factory_boy
+
+# Lint / format
+ruff
+black

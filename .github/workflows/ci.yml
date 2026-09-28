@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rootpulse
+          POSTGRES_USER: rootpulse
+          POSTGRES_PASSWORD: rootpulse
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rootpulse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DJANGO_SECRET_KEY: ci-only-secret
+      DB_NAME: rootpulse
+      DB_USER: rootpulse
+      DB_PASSWORD: rootpulse
+      DB_HOST: localhost
+      DB_PORT: 5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - run: ruff check .
+      - run: black --check .
+      - run: python manage.py check
+      - run: python manage.py makemigrations --check --dry-run
+      - run: python -m pytest
