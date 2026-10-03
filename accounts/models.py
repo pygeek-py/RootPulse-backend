@@ -30,7 +30,11 @@ class AuditLog(models.Model):
     """Security-relevant action trail — see docs/plan/04-security.md #15."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="audit_logs")
+    # Nullable: a failed login for an unknown email has no user to point at,
+    # and SET_NULL keeps the trail after an account is deleted.
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="audit_logs"
+    )
     action = models.CharField(max_length=64)
     target_type = models.CharField(max_length=64, blank=True)
     target_id = models.CharField(max_length=64, blank=True)

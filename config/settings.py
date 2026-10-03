@@ -11,6 +11,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -33,6 +34,11 @@ SECRET_KEY = os.environ.get(
 )
 
 DEBUG = env_bool("DJANGO_DEBUG", True)
+
+# JWTs are signed with SECRET_KEY, so a guessable key means forgeable logins.
+# Refuse to start in production with the dev default or a short key.
+if not DEBUG and (SECRET_KEY.startswith("django-insecure") or len(SECRET_KEY) < 32):
+    raise ImproperlyConfigured("Set DJANGO_SECRET_KEY to a random value of 32+ characters.")
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
@@ -97,7 +103,9 @@ if os.environ.get("DATABASE_URL"):
         "default": dj_database_url.parse(
             os.environ["DATABASE_URL"],
             conn_max_age=600,
-            ssl_require=True,
+            # SSL is mandatory for Neon/Render Postgres; sqlite:/// is allowed
+            # only as a zero-setup local override and has no SSL concept.
+            ssl_require=not os.environ["DATABASE_URL"].startswith("sqlite"),
         )
     }
 else:
@@ -170,7 +178,19 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "user": "60/min",
         "anon": "20/min",
+        # Per-endpoint limits for the auth surface (docs/plan/04-security.md #6).
+        "auth_login": "5/min",
+        "auth_register": "10/hour",
+        "auth_refresh": "30/min",
+        "auth_password_forgot": "5/hour",
+        "auth_password_reset": "10/hour",
+        "auth_github": "20/min",
     },
+    "EXCEPTION_HANDLER": "config.exceptions.api_exception_handler",
+    # How many reverse proxies sit in front of the app (Render = 1). Without
+    # this DRF trusts the whole X-Forwarded-For header, which lets a client
+    # spoof its IP and walk around every per-IP throttle.
+    "NUM_PROXIES": int(os.environ.get("NUM_PROXIES", "0")),
 }
 
 SPECTACULAR_SETTINGS = {
@@ -192,3 +212,37 @@ SIMPLE_JWT = {
 # CORS — explicit allowlist only, never a wildcard (docs/plan/04-security.md #8).
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 CORS_ALLOW_CREDENTIALS = True
+
+
+# Auth (docs/plan/04-security.md #1, #7)
+
+# Where users land after OAuth and where password-reset links point.
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+
+# The refresh token lives in an httpOnly cookie scoped to the auth endpoints.
+# In production the frontend (Vercel) and API (Render) are different *sites*,
+# so the cookie must be SameSite=None; Secure to be sent at all — which is why
+# cookie-using endpoints also verify the Origin header (accounts/security.py).
+# Locally both are `localhost` (same site), where Strict is fine and stricter.
+AUTH_REFRESH_COOKIE_NAME = "refresh_token"
+AUTH_REFRESH_COOKIE_PATH = "/api/v1/auth/"
+AUTH_REFRESH_COOKIE_SECURE = not DEBUG
+AUTH_REFRESH_COOKIE_SAMESITE = os.environ.get(
+    "AUTH_REFRESH_COOKIE_SAMESITE", "Strict" if DEBUG else "None"
+)
+
+GITHUB_OAUTH_CLIENT_ID = os.environ.get("GITHUB_OAUTH_CLIENT_ID", "")
+GITHUB_OAUTH_CLIENT_SECRET = os.environ.get("GITHUB_OAUTH_CLIENT_SECRET", "")
+# Must match the callback URL registered on the GitHub OAuth app.
+GITHUB_OAUTH_REDIRECT_URI = os.environ.get(
+    "GITHUB_OAUTH_REDIRECT_URI", "http://localhost:8000/api/v1/auth/github/callback/"
+)
+
+# Password-reset email. Console in dev; a real provider (Resend) arrives in
+# Phase 8 and only needs these two env vars changed.
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "RootPulse <noreply@rootpulse.dev>")
+PASSWORD_RESET_TIMEOUT = 60 * 60  # reset links are valid for 1 hour
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

@@ -29,6 +29,16 @@ Scheduler and notification-dispatcher management commands (`run_scheduler_once`,
 | `black .` / `black --check .` | Format / check |
 | `python -m pytest` | Test suite |
 
+## Authentication (Phase 3)
+
+Endpoints under `/api/v1/auth/`: `register/`, `login/`, `logout/`, `refresh/`, `me/` (GET/PATCH), `password/forgot/`, `password/reset/`, `github/redirect/`, `github/callback/`. Interactive docs at `/api/v1/docs/`, schema at `/api/v1/schema/`.
+
+- Access JWT (15 min) is returned in the body; refresh JWT (30 days) is an httpOnly cookie scoped to `/api/v1/auth/`, rotated and blacklisted on every use. In production it is `SameSite=None; Secure` (Vercel and Render are different sites), so cookie-authenticated endpoints also check the `Origin` header against `CORS_ALLOWED_ORIGINS` as CSRF defence.
+- Argon2 password hashing; per-IP rate limits (login, register, reset) honouring `NUM_PROXIES`; generic login failures and always-204 forgot-password responses to avoid account enumeration; a password reset revokes every session.
+- GitHub OAuth only trusts verified emails and uses a `state` cookie against login-CSRF. Leave `GITHUB_OAUTH_CLIENT_ID` blank to disable it.
+- Reset emails use `EMAIL_BACKEND` (console locally; Resend arrives in Phase 8).
+- Tests: `python -m pytest` (75 tests; sqlite in-memory, or `TEST_DATABASE=postgres` as CI does).
+
 ## Notes on this environment's setup
 
 - **Local dev runs on Python 3.14** (whatever was installed on this machine) — confirmed working with Django 5.1 and every package in `requirements.txt`. **CI pins Python 3.12** deliberately (Django 5.1's officially supported range), since a bleeding-edge interpreter is fine for local iteration but not the right reproducibility target for CI/production — this is an intentional mismatch, not an oversight.

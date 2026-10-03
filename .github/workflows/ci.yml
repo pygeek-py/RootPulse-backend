@@ -28,6 +28,7 @@ jobs:
       DB_PASSWORD: rootpulse
       DB_HOST: localhost
       DB_PORT: 5432
+      TEST_DATABASE: postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
