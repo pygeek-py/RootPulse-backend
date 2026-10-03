@@ -6,7 +6,7 @@ from django.conf import settings
 from django.http import HttpResponse
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.throttling import BaseThrottle
-from rest_framework_simplejwt.tokens import BlacklistedToken, OutstandingToken, RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import AuditLog, User
 
@@ -33,12 +33,6 @@ def issue_tokens(user: User) -> tuple[RefreshToken, str]:
     the short-lived access token that goes in the response body."""
     refresh = RefreshToken.for_user(user)
     return refresh, str(refresh.access_token)
-
-
-def revoke_all_sessions(user: User) -> None:
-    """Blacklist every outstanding refresh token — used after a password reset."""
-    for token in OutstandingToken.objects.filter(user=user):
-        BlacklistedToken.objects.get_or_create(token=token)
 
 
 def set_refresh_cookie(response: HttpResponse, refresh: RefreshToken) -> None:

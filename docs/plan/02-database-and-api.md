@@ -6,7 +6,7 @@ Single-user per account (no Organization/Membership/Role models — PRD Section 
 
 | Entity (Django model) | Purpose | Key fields | Relationships | Indexes / constraints | Lifecycle notes |
 | --- | --- | --- | --- | --- | --- |
-| `User` (custom) | Account owner | `email` (unique), `password_hash`, `github_id` (nullable, unique), `timezone`, `created_at` | Owns everything below | Unique index on `email`, `github_id` | Custom user model set on day 1 (Django convention: never retrofit this later) |
+| `User` (custom) | Account owner | `email` (unique), unusable password (sign-in is passwordless), `github_id` (nullable, unique), `timezone`, `created_at` | Owns everything below | Unique index on `email`, `github_id` | Custom user model set on day 1 (Django convention: never retrofit this later) |
 | `AlertContact` | A reusable notification destination | `channel` (email/webhook/telegram/discord/slack/push), `config` (JSONB — e.g. webhook URL, chat ID), `delay_seconds`, `repeat_interval_seconds` | belongs to `User`; M2M with `Monitor` via `MonitorAlertContact` | Index on `user_id` | Deleting a contact that's attached to monitors detaches rather than cascades — never silently orphan a monitor's alerting |
 | `Monitor` | One thing being checked | `type` (http/keyword/ping/port/ssl/domain/cron/dns), `name`, `target`, `config` (JSONB, shape varies by type), `interval_seconds`, `status` (pending/up/down/paused), `next_check_at`, `last_check_at` | belongs to `User`; has many `Check`, `Incident`; M2M `AlertContact` | Index on `(next_check_at)` for scheduler polling; index on `user_id` | `next_check_at` is the field the scheduler's `SELECT … skip_locked` claims against |
 | `Check` | One executed check result | `region`, `started_at`, `duration_ms`, `success`, `status_detail`, `dns_ms`, `tcp_ms`, `tls_ms`, `ttfb_ms`, `response_time_ms` | belongs to `Monitor` | Index on `(monitor_id, started_at desc)`; partitioning/rollup strategy in `03-monitoring-engine.md` §Analytics | High-volume, append-only table — retention/rollup policy matters (PRD NFR: 90 days minimum, older rolled up) |
@@ -34,14 +34,13 @@ REST, versioned under `/api/v1/`. DRF `ModelViewSet`s where CRUD is symmetric, p
 
 | Method | Route | Purpose | Auth | Request | Response | Errors |
 | --- | --- | --- | --- | --- | --- | --- |
-| POST | `/auth/register` | Create account | none | `email`, `password` | `user`, `access_token` (+ refresh cookie) | 400 validation, 409 email taken |
-| POST | `/auth/login` | Email/password login | none | `email`, `password` | `user`, `access_token` (+ refresh cookie) | 400, 401 invalid credentials, 429 rate-limited |
+| POST | `/auth/register` | Start sign-up: email a link + 6-digit code (account is created when it is redeemed) | none | `email` | 204 (always) | 400 invalid email, 429 |
+| POST | `/auth/login` | Email a sign-in link + code (nothing is sent for unknown/disabled addresses) | none | `email` | 204 (always, to avoid enumeration) | 400, 429 |
+| POST | `/auth/verify` | Redeem the link token **or** email + code; creates the account on first use | none | `token` or `email`+`code` | `user`, `access_token` (+ refresh cookie) | 400 invalid/expired/used (generic), 429 |
 | POST | `/auth/logout` | Invalidate refresh token | refresh cookie | — | 204 | 401 |
 | POST | `/auth/refresh` | Rotate access token | refresh cookie | — | new `access_token` (+ rotated refresh cookie) | 401 expired/invalid |
 | GET | `/auth/github/redirect` | Start GitHub OAuth | none | — | 302 to GitHub | — |
 | GET | `/auth/github/callback` | Complete GitHub OAuth | none | `code`, `state` | `user`, `access_token` (+ refresh cookie) | 400 state mismatch, 502 GitHub error |
-| POST | `/auth/password/forgot` | Request reset email | none | `email` | 204 (always, to avoid email enumeration) | 429 |
-| POST | `/auth/password/reset` | Complete reset | none | `token`, `new_password` | 204 | 400 invalid/expired token |
 | GET | `/auth/me` | Current user | JWT | — | `user` | 401 |
 
 ### `/api/v1/monitors`

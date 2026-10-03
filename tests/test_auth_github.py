@@ -86,7 +86,6 @@ class TestCallback:
         existing.refresh_from_db()
         assert existing.github_id == "777"
         assert User.objects.count() == 1
-        assert existing.has_usable_password()  # password login keeps working
         assert AuditLog.objects.filter(action="github_linked", user=existing).exists()
 
     def test_an_existing_github_id_wins_even_if_the_email_changed(

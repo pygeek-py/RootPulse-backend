@@ -67,7 +67,7 @@
 | | |
 | --- | --- |
 | Objective | Real API exists; a user can register, log in, and reach a protected endpoint |
-| Frontend | Login/register/forgot-password pages, protected-route middleware, auth state in the typed client |
+| Frontend | Login/register pages (email link + code), verify page, protected-route middleware, auth state in the typed client |
 | Backend | `/auth/*` endpoints in full (`02-database-and-api.md`), GitHub OAuth flow, JWT issuance/refresh, Argon2 hashing, real OpenAPI schema published |
 | Database | `User`, `RefreshToken`, `AuditLog` models + first migrations |
 | Infra | Real staging DB connected; secrets provisioned (JWT signing key, GitHub OAuth app credentials) |

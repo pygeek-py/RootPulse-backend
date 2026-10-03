@@ -22,3 +22,6 @@ GITHUB_OAUTH_CLIENT_ID = "test-client-id"
 GITHUB_OAUTH_CLIENT_SECRET = "test-client-secret"
 GITHUB_OAUTH_REDIRECT_URI = "http://localhost:8000/api/v1/auth/github/callback/"
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+
+# No resend cooldown in tests (its own test turns it back on).
+EMAIL_CHALLENGE_RESEND_SECONDS = 0

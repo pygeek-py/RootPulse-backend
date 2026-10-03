@@ -2,7 +2,7 @@
 
 ## 1. Authentication
 
-- Password hashing: **Argon2** (via `django-argon2` / Django's built-in Argon2 hasher, set as the primary hasher) — stronger than PBKDF2 against GPU-based cracking, and Django ships first-class support.
+- **No user passwords.** Sign-in is an emailed single-use link (256-bit token) or 6-digit code, 15-minute expiry, stored only as hashes, newest email wins, code dies after 5 wrong guesses, one email per address per minute, generic responses so accounts can't be enumerated. The link token travels in the URL fragment and is redeemed by POST so mail scanners can't burn it. Argon2 remains the hasher for admin superusers only: **Argon2** (via `django-argon2` / Django's built-in Argon2 hasher, set as the primary hasher) — stronger than PBKDF2 against GPU-based cracking, and Django ships first-class support.
 - Sessions: short-lived JWT access token (15 min) + rotating refresh token in an **httpOnly, Secure, SameSite=Strict** cookie (30-day expiry, rotated on every use — old refresh tokens are invalidated server-side via a `RefreshToken` table storing hashes, so a stolen refresh token has a small usable window even if the cookie leaks).
 - Logout invalidates the specific refresh token server-side (not just clears the cookie client-side).
 - GitHub OAuth: standard authorization-code flow with `state` parameter checked for CSRF on the callback; GitHub's `id`/`email` mapped to the existing `User` by email if one exists, else a new account is created.
@@ -35,7 +35,7 @@ DRF's built-in throttling (`UserRateThrottle`, `AnonRateThrottle`), tuned per en
 
 | Endpoint class | Limit | Why |
 | --- | --- | --- |
-| `/auth/login`, `/auth/password/forgot` | Aggressive (e.g. 5/min/IP) | Credential-stuffing / enumeration defense |
+| `/auth/login`, `/auth/register` (each sends an email), `/auth/verify` | Aggressive (e.g. 5/min/IP) | Credential-stuffing / enumeration defense |
 | `/auth/register` | Moderate (e.g. 10/hour/IP) | Abuse/spam-account defense |
 | General authenticated API | Generous (matches PRD §6.10's own published limits, e.g. 60/min) | Normal dashboard use shouldn't be throttled |
 | Public status-page endpoints | Moderate per-IP | These are unauthenticated and publicly linked |

@@ -179,11 +179,9 @@ REST_FRAMEWORK = {
         "user": "60/min",
         "anon": "20/min",
         # Per-endpoint limits for the auth surface (docs/plan/04-security.md #6).
-        "auth_login": "5/min",
-        "auth_register": "10/hour",
+        "auth_email_start": "20/hour",  # each one sends an email
+        "auth_verify": "30/min",
         "auth_refresh": "30/min",
-        "auth_password_forgot": "5/hour",
-        "auth_password_reset": "10/hour",
         "auth_github": "20/min",
     },
     "EXCEPTION_HANDLER": "config.exceptions.api_exception_handler",
@@ -238,11 +236,15 @@ GITHUB_OAUTH_REDIRECT_URI = os.environ.get(
     "GITHUB_OAUTH_REDIRECT_URI", "http://localhost:8000/api/v1/auth/github/callback/"
 )
 
-# Password-reset email. Console in dev; a real provider (Resend) arrives in
+# Sign-in emails. Console in dev; a real provider (Resend) arrives in
 # Phase 8 and only needs these two env vars changed.
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "RootPulse <noreply@rootpulse.dev>")
-PASSWORD_RESET_TIMEOUT = 60 * 60  # reset links are valid for 1 hour
+
+# Passwordless sign-in (accounts/passwordless.py).
+EMAIL_CHALLENGE_TTL_SECONDS = 15 * 60
+EMAIL_CHALLENGE_RESEND_SECONDS = 60  # one email per address per minute
+EMAIL_CODE_MAX_ATTEMPTS = 5
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

@@ -48,11 +48,9 @@ def test_api_is_private_by_default_and_cors_has_no_wildcard():
 def test_every_auth_endpoint_has_its_own_rate_limit():
     rates = prod_settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
     for scope in (
-        "auth_login",
-        "auth_register",
+        "auth_email_start",
+        "auth_verify",
         "auth_refresh",
-        "auth_password_forgot",
-        "auth_password_reset",
     ):
         assert scope in rates
 
@@ -61,6 +59,6 @@ def test_openapi_schema_documents_the_auth_api(client):
     resp = client.get("/api/v1/schema/", HTTP_ACCEPT="application/json")
     assert resp.status_code == 200
     schema = resp.json()
-    assert "/api/v1/auth/login/" in schema["paths"]
+    assert "/api/v1/auth/verify/" in schema["paths"]
     assert "/api/v1/auth/me/" in schema["paths"]
     assert "jwtAuth" in schema["components"]["securitySchemes"]

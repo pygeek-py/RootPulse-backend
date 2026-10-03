@@ -101,7 +101,7 @@ Full detail — objectives, frontend/backend/DB/infra work, dependencies, testin
 | 0 | Repository & Infrastructure Setup | Both repos scaffolded, CI green, free-tier accounts provisioned |
 | 1 | Frontend Foundation | Next.js app, design system, shared UI kit, typed API client stub |
 | 2 | Public Landing Page | Full marketing site, live before the product is |
-| 3 | Backend Foundation & Authentication | API scaffold, DB schema, auth (email/password + GitHub OAuth) |
+| 3 | Backend Foundation & Authentication | API scaffold, DB schema, passwordless auth (emailed link/code + GitHub OAuth) |
 | 4 | Core Application Shell | Dashboard layout, nav, protected routes, empty states |
 | 5 | Monitor Management | CRUD for all 8 monitor types, single scrollable creation form |
 | 6 | Monitoring Engine | Scheduler, probers, multi-location checks, timing breakdown |

@@ -2,15 +2,9 @@ import hmac
 import secrets
 
 from django.conf import settings
-from django.contrib.auth import authenticate
-from django.contrib.auth.tokens import default_token_generator
-from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.mail import send_mail
 from django.http import HttpResponseRedirect
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
-from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -18,25 +12,21 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from . import github
-from .models import User
+from . import github, passwordless
+from .models import EmailChallenge, User
 from .serializers import (
     AuthResponseSerializer,
-    LoginSerializer,
-    PasswordForgotSerializer,
-    PasswordResetSerializer,
+    EmailStartSerializer,
     RefreshResponseSerializer,
-    RegisterSerializer,
     UserSerializer,
     UserUpdateSerializer,
-    validate_new_password,
+    VerifySerializer,
 )
 from .services import (
     audit,
     clear_refresh_cookie,
     issue_tokens,
     require_trusted_origin,
-    revoke_all_sessions,
     set_refresh_cookie,
 )
 
@@ -67,53 +57,64 @@ def _auth_response(user: User, status_code: int) -> Response:
     return response
 
 
-@extend_schema(
-    tags=["auth"],
-    request=RegisterSerializer,
-    responses={201: AuthResponseSerializer, 409: OpenApiResponse(description="Email taken")},
-)
-class RegisterView(PublicAuthView):
-    throttle_scope = "auth_register"
+class EmailStartView(PublicAuthView):
+    """Email a sign-in link + code. Always 204, whether or not the address has
+    an account, so the endpoint can't be used to find out who is registered."""
+
+    throttle_scope = "auth_email_start"
+    purpose: str
 
     def post(self, request):
-        email = str(request.data.get("email", "")).strip().lower()
-        if email and User.objects.filter(email__iexact=email).exists():
-            return Response(
-                {
-                    "detail": "An account with this email already exists.",
-                    "field_errors": {"email": ["An account with this email already exists."]},
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
-
-        serializer = RegisterSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        audit("register", request, user)
-        return _auth_response(user, status.HTTP_201_CREATED)
-
-
-@extend_schema(
-    tags=["auth"],
-    request=LoginSerializer,
-    responses={200: AuthResponseSerializer, 401: OpenApiResponse(description="Bad credentials")},
-)
-class LoginView(PublicAuthView):
-    throttle_scope = "auth_login"
-
-    def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+        serializer = EmailStartSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data["email"]
+        sent = passwordless.start(email, self.purpose)
+        audit("email_challenge_sent" if sent else "email_challenge_skipped", request, email=email)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
-        user = authenticate(request, username=email, password=serializer.validated_data["password"])
-        if user is None:
-            # One generic message for wrong password, unknown email, inactive
-            # account and GitHub-only accounts — nothing to enumerate.
-            audit("login_failed", request, email=email)
-            raise AuthenticationFailed("Invalid email or password.")
 
-        audit("login", request, user)
+@extend_schema(tags=["auth"], request=EmailStartSerializer, responses={204: None})
+class RegisterView(EmailStartView):
+    purpose = EmailChallenge.SIGNUP
+
+
+@extend_schema(tags=["auth"], request=EmailStartSerializer, responses={204: None})
+class LoginView(EmailStartView):
+    purpose = EmailChallenge.LOGIN
+
+
+@extend_schema(
+    tags=["auth"],
+    request=VerifySerializer,
+    responses={
+        200: AuthResponseSerializer,
+        400: OpenApiResponse(description="Invalid or expired link/code"),
+    },
+)
+class VerifyView(PublicAuthView):
+    """Redeem the emailed link token, or email + code. Creates the account on
+    first use. POST-only on purpose: mail scanners that prefetch the link with
+    a GET must not burn the single-use token."""
+
+    throttle_scope = "auth_verify"
+
+    def post(self, request):
+        serializer = VerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            if data.get("token"):
+                user, created = passwordless.verify_link(data["token"])
+            else:
+                user, created = passwordless.verify_code(data["email"], data["code"])
+        except passwordless.InvalidChallenge:
+            audit("email_verify_failed", request)
+            return Response(
+                {"detail": "This link or code is invalid or has expired.", "field_errors": {}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        audit("register" if created else "login", request, user, provider="email")
         return _auth_response(user, status.HTTP_200_OK)
 
 
@@ -187,69 +188,6 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(UserSerializer(request.user).data)
-
-
-@extend_schema(tags=["auth"], request=PasswordForgotSerializer, responses={204: None})
-class PasswordForgotView(PublicAuthView):
-    throttle_scope = "auth_password_forgot"
-
-    def post(self, request):
-        serializer = PasswordForgotSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data["email"]
-
-        user = User.objects.filter(email__iexact=email, is_active=True).first()
-        if user is not None:
-            uid = urlsafe_base64_encode(str(user.pk).encode())
-            token = default_token_generator.make_token(user)
-            link = f"{settings.FRONTEND_URL}/reset-password/{uid}.{token}"
-            send_mail(
-                "Reset your RootPulse password",
-                f"Use this link to choose a new password (valid for 1 hour):\n\n{link}\n\n"
-                "If you didn't ask for this, you can ignore this email.",
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-            )
-            audit("password_reset_requested", request, user)
-
-        # Identical response whether or not the account exists.
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-@extend_schema(tags=["auth"], request=PasswordResetSerializer, responses={204: None})
-class PasswordResetView(PublicAuthView):
-    throttle_scope = "auth_password_reset"
-
-    def post(self, request):
-        serializer = PasswordResetSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        user = self._user_for_token(serializer.validated_data["token"])
-        if user is None:
-            return Response(
-                {"detail": "This reset link is invalid or has expired."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        validate_new_password(serializer.validated_data["new_password"], user, "new_password")
-        user.set_password(serializer.validated_data["new_password"])
-        user.save(update_fields=["password"])
-        revoke_all_sessions(user)  # whoever had a session before the reset is out
-        audit("password_reset", request, user)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @staticmethod
-    def _user_for_token(combined: str) -> User | None:
-        uid, _, token = combined.partition(".")
-        try:
-            pk = urlsafe_base64_decode(uid).decode()
-            user = User.objects.filter(pk=pk, is_active=True).first()
-        except (ValueError, TypeError, UnicodeDecodeError, OverflowError, DjangoValidationError):
-            # Includes a uid that decodes to something that isn't a UUID.
-            return None
-        if user is None or not default_token_generator.check_token(user, token):
-            return None
-        return user
 
 
 def _login_redirect(error: str) -> HttpResponseRedirect:
