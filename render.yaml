@@ -26,6 +26,14 @@ services:
         generateValue: true
       - key: RESEND_API_KEY
         sync: false
+      - key: EMAIL_HOST
+        value: smtp.resend.com
+      - key: EMAIL_HOST_USER
+        value: resend
+      - key: EMAIL_HOST_PASSWORD
+        sync: false # the Resend API key
+      - key: DEFAULT_FROM_EMAIL
+        sync: false # e.g. RootPulse <login@yourdomain.com>, on a domain verified in Resend
       - key: FRONTEND_URL
         sync: false # the Vercel URL, e.g. https://rootpulse.vercel.app
       - key: NUM_PROXIES

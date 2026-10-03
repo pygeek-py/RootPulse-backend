@@ -236,9 +236,24 @@ GITHUB_OAUTH_REDIRECT_URI = os.environ.get(
     "GITHUB_OAUTH_REDIRECT_URI", "http://localhost:8000/api/v1/auth/github/callback/"
 )
 
-# Sign-in emails. Console in dev; a real provider (Resend) arrives in
-# Phase 8 and only needs these two env vars changed.
-EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+# Sign-in emails go over SMTP whenever EMAIL_HOST is set (Gmail, Resend, Brevo…
+# all work), and print to the server console otherwise. EMAIL_BACKEND overrides.
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)  # STARTTLS on 587
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)  # implicit TLS on 465 (then disable TLS)
+# Sign-in emails are sent inside the request, so a dead SMTP server must fail fast.
+EMAIL_TIMEOUT = 10
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.smtp.EmailBackend"
+    if EMAIL_HOST
+    else "django.core.mail.backends.console.EmailBackend",
+)
+# Most providers (Gmail included) only deliver mail whose From matches the
+# authenticated account or a verified domain, so set this to match.
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "RootPulse <noreply@rootpulse.dev>")
 
 # Passwordless sign-in (accounts/passwordless.py).
