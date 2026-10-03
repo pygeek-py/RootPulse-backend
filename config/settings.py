@@ -244,12 +244,13 @@ EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)  # STARTTLS on 587
 EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)  # implicit TLS on 465 (then disable TLS)
-# Sign-in emails are sent inside the request, so a dead SMTP server must fail fast.
-EMAIL_TIMEOUT = 10
+# Sign-in emails are sent inside the request, so a dead SMTP server must fail
+# fast: a short timeout, with accounts.mail retrying a stalled connection.
+EMAIL_TIMEOUT = 4
 EMAIL_BACKEND = os.environ.get(
     "EMAIL_BACKEND",
     (
-        "django.core.mail.backends.smtp.EmailBackend"
+        "accounts.mail.RetryingSMTPBackend"
         if EMAIL_HOST
         else "django.core.mail.backends.console.EmailBackend"
     ),

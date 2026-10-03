@@ -199,6 +199,21 @@ class TestHygiene:
         monkeypatch.setattr("accounts.passwordless.send_mail", boom)
         assert start(api, LOGIN, user.email).status_code == 204
 
+    def test_a_failed_send_does_not_block_an_immediate_resend(
+        self, api, user, settings, monkeypatch
+    ):
+        settings.EMAIL_CHALLENGE_RESEND_SECONDS = 60
+        monkeypatch.setattr(
+            "accounts.passwordless.send_mail",
+            lambda *a, **k: (_ for _ in ()).throw(OSError("down")),
+        )
+        start(api, LOGIN, user.email)
+        monkeypatch.undo()
+
+        start(api, LOGIN, user.email)
+
+        assert len(mail.outbox) == 1
+
     def test_the_email_endpoints_are_rate_limited(self, api, monkeypatch):
         from rest_framework.settings import api_settings
         from rest_framework.throttling import ScopedRateThrottle

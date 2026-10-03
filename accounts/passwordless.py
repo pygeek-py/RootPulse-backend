@@ -67,7 +67,7 @@ def start(email: str, purpose: str) -> bool:
     with transaction.atomic():
         # Only the newest email is valid; older links/codes stop working.
         EmailChallenge.objects.filter(email=email, consumed_at__isnull=True).update(consumed_at=now)
-        EmailChallenge.objects.create(
+        challenge = EmailChallenge.objects.create(
             email=email,
             purpose=purpose,
             link_hash=_digest(link_token),
@@ -89,6 +89,8 @@ def start(email: str, purpose: str) -> bool:
         )
     except Exception:  # noqa: BLE001 - an SMTP outage must not change the response
         logger.exception("Failed to send sign-in email")
+        # Nothing reached the user, so don't let this challenge hold the resend cooldown.
+        EmailChallenge.objects.filter(pk=challenge.pk).update(consumed_at=timezone.now())
         return False
     return True
 
