@@ -468,3 +468,71 @@ class TestProberClient:
         )
         assert [p.name for p, _ in answers] == ["tokyo", "frankfurt"]
         assert all(res.success for _, res in answers)
+
+
+class TestCommandLoop:
+    """--loop is for local development; it must survive a database that drops idle connections."""
+
+    def run_loop(self, monkeypatch, passes):
+        import time as time_module
+
+        from django.db import connections
+
+        from monitoring.management.commands import run_scheduler_once as command
+
+        closed = []
+        monkeypatch.setattr(connections, "close_all", lambda: closed.append(1))
+        outcomes = iter(passes)
+
+        def fake_pass(batch_size=None):
+            outcome = next(outcomes)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        monkeypatch.setattr(command, "run_scheduler_once", fake_pass)
+
+        sleeps = []
+
+        def fake_sleep(seconds):
+            sleeps.append(seconds)
+            if len(sleeps) >= len(passes):
+                raise KeyboardInterrupt
+
+        monkeypatch.setattr(time_module, "sleep", fake_sleep)
+        monkeypatch.setattr(command.time, "sleep", fake_sleep)
+        out, err = StringIO(), StringIO()
+        with pytest.raises(KeyboardInterrupt):
+            call_command("run_scheduler_once", loop=60, stdout=out, stderr=err)
+        return out.getvalue(), err.getvalue(), closed, sleeps
+
+    def test_releases_its_connection_between_passes(self, monkeypatch):
+        from monitoring.engine import PassSummary
+
+        out, err, closed, sleeps = self.run_loop(monkeypatch, [PassSummary(), PassSummary()])
+        assert out.count("claimed=") == 2
+        assert len(closed) == 2 and sleeps == [60, 60]
+
+    def test_a_dropped_connection_does_not_end_the_loop(self, monkeypatch):
+        from django.db import OperationalError
+
+        from monitoring.engine import PassSummary
+
+        out, err, closed, _ = self.run_loop(
+            monkeypatch,
+            [OperationalError("server closed the connection unexpectedly"), PassSummary()],
+        )
+        assert "pass failed, will retry" in err
+        assert "claimed=" in out  # the next pass ran
+
+    def test_without_loop_a_database_error_is_not_swallowed(self, monkeypatch):
+        from django.db import OperationalError
+
+        from monitoring.management.commands import run_scheduler_once as command
+
+        def boom(batch_size=None):
+            raise OperationalError("down")
+
+        monkeypatch.setattr(command, "run_scheduler_once", boom)
+        with pytest.raises(OperationalError):
+            call_command("run_scheduler_once")
