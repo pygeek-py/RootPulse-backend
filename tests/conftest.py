@@ -73,3 +73,24 @@ def auth_api(api, user, sign_in):
     """An API client already signed in as `user` (Bearer access token)."""
     api.credentials(HTTP_AUTHORIZATION=f"Bearer {sign_in(api, user.email).json()['access_token']}")
     return api
+
+
+@pytest.fixture(autouse=True)
+def dns(monkeypatch):
+    """No test touches the real network: every host name resolves to a public IP
+    unless the test maps it elsewhere (`dns["evil.example.com"] = ["10.0.0.5"]`),
+    or to nothing at all (`dns["gone.example.com"] = None`)."""
+    import ipaddress
+
+    from monitoring import target_validation
+
+    table: dict[str, list[str] | None] = {}
+
+    def fake_getaddrinfo(host):
+        answer = table.get(host, ["93.184.216.34"])
+        if answer is None:
+            raise OSError("Name or service not known")
+        return [ipaddress.ip_address(a) for a in answer]
+
+    monkeypatch.setattr(target_validation, "_getaddrinfo", fake_getaddrinfo)
+    return table

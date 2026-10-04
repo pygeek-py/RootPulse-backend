@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "corsheaders",
     # Local
     "accounts",
+    "monitoring",
 ]
 
 MIDDLEWARE = [
@@ -258,6 +259,11 @@ EMAIL_BACKEND = os.environ.get(
 # Most providers (Gmail included) only deliver mail whose From matches the
 # authenticated account or a verified domain, so set this to match.
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "RootPulse <noreply@rootpulse.dev>")
+
+# Public base URL of this API: used to build heartbeat ping URLs shown to users.
+API_PUBLIC_URL = os.environ.get("API_PUBLIC_URL", "http://localhost:8000").rstrip("/")
+# A free-tier guard: one user can't queue unbounded checks (docs/plan/00-overview.md).
+MAX_MONITORS_PER_USER = int(os.environ.get("MAX_MONITORS_PER_USER", "50"))
 
 # Passwordless sign-in (accounts/passwordless.py).
 EMAIL_CHALLENGE_TTL_SECONDS = 15 * 60
