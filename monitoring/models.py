@@ -73,6 +73,13 @@ class Monitor(models.Model):
     # What the scheduler claims against (Phase 6). NULL means "never due" (paused).
     next_check_at = models.DateTimeField(null=True, blank=True)
     last_check_at = models.DateTimeField(null=True, blank=True)
+    # Denormalised from the latest check so lists and the dashboard don't join `Check`.
+    last_response_ms = models.PositiveIntegerField(null=True, blank=True)
+    last_status_detail = models.CharField(max_length=64, blank=True)
+    # When a heartbeat monitor's job last pinged its URL (type=cron only).
+    last_heartbeat_at = models.DateTimeField(null=True, blank=True)
+    # Engine bookkeeping that isn't a setting, e.g. a DNS monitor's last-seen records.
+    state = models.JSONField(default=dict, blank=True)
     # Secret path segment of a heartbeat monitor's ping URL. Only set for type=cron.
     heartbeat_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
     alert_contacts = models.ManyToManyField(
@@ -105,6 +112,46 @@ class Monitor(models.Model):
     @staticmethod
     def new_heartbeat_token() -> str:
         return _new_heartbeat_token()
+
+
+class Check(models.Model):
+    """One executed check. Append-only and high volume (a 5-minute monitor from three
+    regions writes ~860 a day), so it uses a bigint key and is indexed for the
+    detail page's "latest checks for this monitor" query.
+
+    `success` is three-valued: True = up, False = down, None = inconclusive (a
+    problem on our side or an unreadable result, such as a TLD without RDAP).
+    Inconclusive checks never change a monitor's status or open an incident.
+    """
+
+    id = models.BigAutoField(primary_key=True)
+    monitor = models.ForeignKey(Monitor, on_delete=models.CASCADE, related_name="checks")
+    # Where it ran from: the API's own region, or a Cloudflare prober's name.
+    region = models.CharField(max_length=32)
+    # A re-check run to confirm a failure, as opposed to the scheduled check.
+    confirmation = models.BooleanField(default=False)
+    started_at = models.DateTimeField()
+    duration_ms = models.PositiveIntegerField(null=True, blank=True)
+    success = models.BooleanField(null=True)
+    # Short machine-readable outcome ("ok", "timeout", ...): see monitoring/checks/result.py
+    status_detail = models.CharField(max_length=64, blank=True)
+    status_code = models.PositiveSmallIntegerField(null=True, blank=True)
+    # Timing breakdown for HTTP(S) checks: the raw data behind root-cause analysis (Phase 10).
+    dns_ms = models.PositiveIntegerField(null=True, blank=True)
+    tcp_ms = models.PositiveIntegerField(null=True, blank=True)
+    tls_ms = models.PositiveIntegerField(null=True, blank=True)
+    ttfb_ms = models.PositiveIntegerField(null=True, blank=True)
+    # Type-specific extras: SSL days remaining, DNS record diff, domain expiry date, ...
+    detail = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["monitor", "-started_at"]),
+            models.Index(fields=["started_at"]),  # retention sweeps
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.monitor_id} {self.region} {self.status_detail}"
 
 
 class MonitorAlertContact(models.Model):

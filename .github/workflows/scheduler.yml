@@ -1,0 +1,54 @@
+# Triggers one scheduler pass every five minutes (docs/plan/03-monitoring-engine.md).
+#
+# Render's free tier has no always-on worker or cron, so this is what makes monitors
+# actually get checked. It also keeps the free web service from going to sleep.
+#
+# Secrets (Settings -> Secrets and variables -> Actions):
+#   API_URL                   e.g. https://rootpulse-api.onrender.com  (no trailing slash)
+#   SCHEDULER_SHARED_SECRET   the same value as the API's SCHEDULER_SHARED_SECRET
+#
+# GitHub may delay scheduled runs by a few minutes under load, and pauses them in
+# repositories with no activity for 60 days; a run history that stops is itself a signal.
+
+name: Scheduler
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+# Never stack passes: if one is still running, wait. (The API's row locks make an overlap
+# safe anyway; this just avoids wasted runs.)
+concurrency:
+  group: scheduler
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  run-due-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Trigger a scheduler pass
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          SCHEDULER_SHARED_SECRET: ${{ secrets.SCHEDULER_SHARED_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${API_URL:-}" ] || [ -z "${SCHEDULER_SHARED_SECRET:-}" ]; then
+            echo "API_URL and SCHEDULER_SHARED_SECRET must be set as repository secrets." >&2
+            exit 1
+          fi
+
+          # X-RootPulse-Signature: t=<unix time>,v1=<hex HMAC-SHA256 of "<t>." + body>.
+          # The body is empty, so the signed text is just "<t>.".
+          ts=$(date +%s)
+          sig=$(printf '%s.' "$ts" | openssl dgst -sha256 -hmac "$SCHEDULER_SHARED_SECRET" | sed 's/^.* //')
+
+          # A sleeping Render service can take about a minute to wake, hence the long timeout.
+          curl --fail-with-body --silent --show-error \
+            --max-time 150 --retry 2 --retry-delay 15 --retry-all-errors \
+            -X POST "$API_URL/internal/run-due-checks/" \
+            -H "X-RootPulse-Signature: t=$ts,v1=$sig"
+          echo

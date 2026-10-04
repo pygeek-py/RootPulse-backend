@@ -23,7 +23,13 @@ services:
       - key: CORS_ALLOWED_ORIGINS
         sync: false # set to the Vercel frontend URL
       - key: PROBER_SHARED_SECRET
-        generateValue: true
+        generateValue: true # copy this value into each Worker: `wrangler secret put PROBER_SHARED_SECRET`
+      - key: PROBER_URLS
+        sync: false # name=https://worker-url,name=https://worker-url
+      - key: SCHEDULER_SHARED_SECRET
+        generateValue: true # copy this value into the SCHEDULER_SHARED_SECRET GitHub Actions secret
+      - key: PRIMARY_REGION
+        value: render
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_HOST

@@ -325,7 +325,10 @@ class TestOwnership:
 class TestRetrieveAndUpdate:
     def test_retrieve(self, auth_api):
         monitor = create(auth_api).json()
-        assert auth_api.get(f"{URL}{monitor['id']}/").json() == monitor
+        detail = auth_api.get(f"{URL}{monitor['id']}/").json()
+        summary = detail.pop("summary")  # only the detail view carries the 24h summary
+        assert detail == monitor
+        assert summary["checks"] == 0 and summary["uptime_percent"] is None
 
     def test_unknown_id(self, auth_api):
         assert auth_api.get(f"{URL}00000000-0000-4000-8000-000000000000/").status_code == 404

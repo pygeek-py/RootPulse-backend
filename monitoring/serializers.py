@@ -5,8 +5,8 @@ from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema_fiel
 from rest_framework import serializers
 
 from . import target_validation as tv
-from .models import Monitor
-from .services import first_check_due
+from .models import Check, Monitor
+from .services import first_check_due, summarize
 from .types import CONFIG_SERIALIZERS, SPECS
 
 
@@ -38,6 +38,9 @@ class MonitorSerializer(serializers.ModelSerializer):
             "status",
             "next_check_at",
             "last_check_at",
+            "last_response_ms",
+            "last_status_detail",
+            "last_heartbeat_at",
             "heartbeat_url",
             "created_at",
             "updated_at",
@@ -49,6 +52,9 @@ class MonitorSerializer(serializers.ModelSerializer):
             "status",
             "next_check_at",
             "last_check_at",
+            "last_response_ms",
+            "last_status_detail",
+            "last_heartbeat_at",
             "heartbeat_url",
             "created_at",
             "updated_at",
@@ -146,3 +152,54 @@ class MonitorSerializer(serializers.ModelSerializer):
             instance.next_check_at = first_check_due(instance)
         instance.save()
         return instance
+
+
+class CheckSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Check
+        fields = [
+            "id",
+            "region",
+            "confirmation",
+            "started_at",
+            "duration_ms",
+            "success",
+            "status_detail",
+            "status_code",
+            "dns_ms",
+            "tcp_ms",
+            "tls_ms",
+            "ttfb_ms",
+            "detail",
+        ]
+        read_only_fields = fields
+
+
+class MonitorSummarySerializer(serializers.Serializer):
+    """The last 24 hours at a glance (scheduled checks from the primary region only)."""
+
+    window_hours = serializers.IntegerField()
+    checks = serializers.IntegerField()
+    uptime_percent = serializers.FloatField(allow_null=True)
+    avg_response_ms = serializers.IntegerField(allow_null=True)
+    p95_response_ms = serializers.IntegerField(allow_null=True)
+
+
+class MonitorDetailSerializer(MonitorSerializer):
+    summary = serializers.SerializerMethodField()
+
+    class Meta(MonitorSerializer.Meta):
+        fields = [*MonitorSerializer.Meta.fields, "summary"]
+        read_only_fields = [*MonitorSerializer.Meta.read_only_fields, "summary"]
+
+    @extend_schema_field(MonitorSummarySerializer)
+    def get_summary(self, obj: Monitor):
+        return summarize(obj)
+
+
+class CheckPageSerializer(serializers.Serializer):
+    """Documents the cursor-paginated checks response (cursor paging has no `count`)."""
+
+    next = serializers.URLField(allow_null=True)
+    previous = serializers.URLField(allow_null=True)
+    results = CheckSerializer(many=True)

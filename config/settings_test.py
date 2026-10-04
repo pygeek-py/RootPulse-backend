@@ -25,3 +25,11 @@ CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"
 
 # No resend cooldown in tests (its own test turns it back on).
 EMAIL_CHALLENGE_RESEND_SECONDS = 0
+
+# Engine: run checks inline, never pause, and never talk to real probers.
+CHECK_WORKERS = 1
+CHECK_RECHECK_DELAY_SECONDS = 0
+PROBER_URLS = ""
+PROBER_SHARED_SECRET = ""
+SCHEDULER_SHARED_SECRET = "test-scheduler-secret"
+PRIMARY_REGION = "primary"

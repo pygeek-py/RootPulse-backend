@@ -183,6 +183,7 @@ REST_FRAMEWORK = {
         "auth_email_start": "20/hour",  # each one sends an email
         "auth_verify": "30/min",
         "auth_refresh": "30/min",
+        "heartbeat": "120/min",  # per source IP; a job normally pings once per run
         "auth_github": "20/min",
     },
     "EXCEPTION_HANDLER": "config.exceptions.api_exception_handler",
@@ -264,6 +265,22 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "RootPulse <noreply@ro
 API_PUBLIC_URL = os.environ.get("API_PUBLIC_URL", "http://localhost:8000").rstrip("/")
 # A free-tier guard: one user can't queue unbounded checks (docs/plan/00-overview.md).
 MAX_MONITORS_PER_USER = int(os.environ.get("MAX_MONITORS_PER_USER", "50"))
+
+# Monitoring engine (monitoring/engine.py).
+PRIMARY_REGION = os.environ.get("PRIMARY_REGION", "primary")  # label for checks run by this API
+CHECK_WORKERS = int(os.environ.get("CHECK_WORKERS", "20"))
+CHECK_BATCH_SIZE = int(os.environ.get("CHECK_BATCH_SIZE", "100"))
+# Stop starting new checks after this long, so the trigger's HTTP request can finish.
+CHECK_PASS_BUDGET_SECONDS = int(os.environ.get("CHECK_PASS_BUDGET_SECONDS", "80"))
+CHECK_RECHECK_DELAY_SECONDS = int(os.environ.get("CHECK_RECHECK_DELAY_SECONDS", "5"))
+CHECK_TCP_TIMEOUT = int(os.environ.get("CHECK_TCP_TIMEOUT", "10"))
+CHECK_USER_AGENT = "RootPulse/1.0 (+https://rootpulse.dev; uptime monitoring)"
+# Regional probers (Cloudflare Workers): "name=https://url,name=https://url".
+PROBER_URLS = os.environ.get("PROBER_URLS", "")
+PROBER_SHARED_SECRET = os.environ.get("PROBER_SHARED_SECRET", "")
+# Signs the GitHub Actions call to /internal/run-due-checks/. Separate from the prober
+# secret so each can be rotated without the other.
+SCHEDULER_SHARED_SECRET = os.environ.get("SCHEDULER_SHARED_SECRET", "")
 
 # Passwordless sign-in (accounts/passwordless.py).
 EMAIL_CHALLENGE_TTL_SECONDS = 15 * 60

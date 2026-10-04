@@ -1,0 +1,14 @@
+# Deploy one copy of this Worker per region you want a prober in, each under its own
+# name, e.g. `wrangler deploy --name rootpulse-prober-eu --var PROBER_NAME:frankfurt`.
+# Cloudflare runs a Worker close to whoever calls it, so spreading the probers across
+# regions means deploying where the API's callers differ, or using Smart Placement
+# hints. See README.md for the options and the (free) limits.
+name = "rootpulse-prober"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+PROBER_NAME = "primary"
+
+# The shared secret is NOT stored here. Set it with:
+#   npx wrangler secret put PROBER_SHARED_SECRET

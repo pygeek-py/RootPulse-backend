@@ -1,0 +1,6 @@
+{
+  "secret": "shared-secret-for-tests",
+  "timestamp": 1700000000,
+  "body": "{\"type\": \"http\", \"target\": \"https://example.com\", \"config\": {\"timeout_seconds\": 10}}",
+  "header": "t=1700000000,v1=923f6be7765e8f8836852c6baa50ecc19801262f0b84d4f42cd08fb01f53aa8c"
+}

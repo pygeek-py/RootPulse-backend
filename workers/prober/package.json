@@ -1,0 +1,15 @@
+{
+  "name": "rootpulse-prober",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Regional prober for RootPulse, run as a Cloudflare Worker.",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
