@@ -91,8 +91,10 @@ class MonitorViewSet(
         return qs.order_by(SORTS.get(params.get("sort", ""), "-created_at"), "id")
 
     def get_serializer_class(self):
-        # The detail view adds a 24h summary, which would cost a query per row in the list.
-        return MonitorDetailSerializer if self.action == "retrieve" else MonitorSerializer
+        # Everything about a single monitor returns the same shape, including the 24h summary
+        # (the frontend caches whatever pause, resume or an edit returns as the detail view's
+        # data). Only the list leaves it out, since it would cost a query per row.
+        return MonitorSerializer if self.action == "list" else MonitorDetailSerializer
 
     def perform_create(self, serializer):
         owned = Monitor.objects.filter(user=self.request.user).count()

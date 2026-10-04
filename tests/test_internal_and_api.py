@@ -342,6 +342,30 @@ class TestSummary:
         assert listed["last_response_ms"] is None and "last_status_detail" in listed
 
 
+class TestSingleMonitorShape:
+    """pause, resume, edit and create return what retrieve returns, summary included."""
+
+    def test_every_single_monitor_response_has_the_summary(self, auth_api, user):
+        monitor = make(user)
+        check(monitor)
+        base = f"{URL}{monitor.id}/"
+        responses = {
+            "retrieve": auth_api.get(base),
+            "patch": auth_api.patch(base, {"name": "Renamed"}, format="json"),
+            "pause": auth_api.post(f"{base}pause/"),
+            "resume": auth_api.post(f"{base}resume/"),
+        }
+        for name, resp in responses.items():
+            assert resp.status_code == 200, name
+            assert resp.json()["summary"]["checks"] == 1, name
+
+    def test_create_includes_it_too(self, auth_api):
+        resp = auth_api.post(
+            URL, {"type": "http", "name": "New", "target": "https://example.com"}, format="json"
+        )
+        assert resp.status_code == 201 and resp.json()["summary"]["checks"] == 0
+
+
 class TestCommand:
     def test_runs_one_pass_and_prints_a_summary(self, user, monkeypatch):
         from monitoring import engine

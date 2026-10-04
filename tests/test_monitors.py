@@ -326,7 +326,8 @@ class TestRetrieveAndUpdate:
     def test_retrieve(self, auth_api):
         monitor = create(auth_api).json()
         detail = auth_api.get(f"{URL}{monitor['id']}/").json()
-        summary = detail.pop("summary")  # only the detail view carries the 24h summary
+        summary = detail.pop("summary")
+        monitor.pop("summary")  # create returns the same shape as retrieve
         assert detail == monitor
         assert summary["checks"] == 0 and summary["uptime_percent"] is None
 

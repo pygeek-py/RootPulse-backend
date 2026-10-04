@@ -73,3 +73,36 @@ Once any of these exist, tell me and I'll wire up the corresponding config/secre
 - Heartbeat monitors get a secret URL (`/api/v1/heartbeat/{token}/`); receiving pings is added with the engine.
 - `AlertContact`, `MonitorAlertContact` and `MaintenanceWindow` models exist (admin only for now); their endpoints come with Phases 8 and 6.
 - Validation errors are flattened to dotted field paths (`config.timeout_seconds`). 271 tests.
+
+## Monitoring engine (Phase 6)
+
+Monitors are checked by **scheduler passes**. A pass claims everything that is due from Postgres (`select_for_update(skip_locked=True)`, so two overlapping passes can never claim the same monitor), pushes each claimed monitor's `next_check_at` one interval ahead, then runs the checks in a bounded thread pool (`CHECK_WORKERS`, default 20) within a time budget (`CHECK_PASS_BUDGET_SECONDS`, default 80). No lock is held during network calls.
+
+**Running it locally** (nothing runs the checks until you do):
+
+```bash
+python manage.py run_scheduler_once              # one pass
+python manage.py run_scheduler_once --loop 60    # a pass every minute, until Ctrl+C
+```
+
+**In production** the pass is triggered every five minutes by `.github/workflows/scheduler.yml`, which calls `POST /internal/run-due-checks/` with an HMAC signature (`X-RootPulse-Signature`, over a fresh timestamp, so captures can't be replayed). It also keeps Render's free service awake. Set up:
+
+1. Render generates `SCHEDULER_SHARED_SECRET`; copy its value into a GitHub Actions **secret** of the same name, and add an `API_URL` secret (the API's public URL).
+2. Optional: deploy the Cloudflare Worker probers (`workers/prober/README.md`) and set `PROBER_URLS` and `PROBER_SHARED_SECRET` so a failure is confirmed from several regions. Without probers a failure is re-checked from the API after a short delay.
+
+What each type does:
+
+| Type | Check |
+| --- | --- |
+| HTTP, keyword | Resolves the host, **connects to the vetted IP** (never re-resolving), re-vets every redirect, captures a `dns/tcp/tls/ttfb` breakdown, caps the body at 1 MB, enforces the configured timeout. Keyword matching is case-sensitive. |
+| Ping, port | TCP connect (Render and Workers can't send ICMP). |
+| SSL | Real TLS handshake with chain and host-name verification; days until expiry vs `warn_days`. |
+| Domain | RDAP lookup (IANA bootstrap). A TLD without RDAP or an unreadable answer is *inconclusive*, never "down". |
+| DNS | Resolves the chosen record types; the first check records a baseline, a change fails once and becomes the new baseline. |
+| Heartbeat | No outbound request: the job pings `/api/v1/heartbeat/{token}/`; late = last ping + interval + grace. |
+
+**Status rules.** A monitor goes *down* only after a failure is **confirmed**: two regions must agree (the API plus at least one prober), or, with no probers, a re-check from the API also fails. A failure that isn't confirmed is a *blip*: logged, no status change. A monitor that is already down isn't re-confirmed. **Inconclusive** results (a blocked target, an unreadable lookup, a crashed check) are recorded but never change status. SSL re-checks locally; domain, DNS and heartbeat failures are deterministic and confirmed immediately. Status changes call `monitoring/hooks.py:status_changed`, which incidents and notifications (Phases 7 and 8) hook into.
+
+`GET /api/v1/monitors/{id}/checks/` is cursor-paginated (`since`, `until`, `region`, `confirmation`), and the monitor detail includes a 24-hour `summary` (uptime, average and p95 response time). Raw checks are only read over short windows; long-range analytics will come from rollups (Phase 12), and a retention sweep for checks older than 90 days arrives with them.
+
+Tests: `python -m pytest` (432). The real row-lock race and the thread pool run only on Postgres (`TEST_DATABASE=postgres`, which CI uses); the Worker's 26 tests run with `npm test` in `workers/prober`.
