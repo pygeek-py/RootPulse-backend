@@ -1,3 +1,6 @@
+import uuid
+
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
 
@@ -79,3 +82,48 @@ class NotificationDelivery(models.Model):
 
     def __str__(self) -> str:
         return f"{self.event} -> {self.contact_name} ({self.channel}): {self.status}"
+
+
+class IntegrationLink(models.Model):
+    """A one-time "connect my Telegram" request.
+
+    The person clicks Connect, gets a link containing a random token, and presses Start in
+    Telegram. The bot then receives `/start <token>` from *that* chat, which proves whose chat
+    it is. Only a hash of the token is stored, it works once, and it expires in minutes.
+    """
+
+    class Provider(models.TextChoices):
+        TELEGRAM = "telegram", "Telegram"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="integration_links"
+    )
+    provider = models.CharField(max_length=16, choices=Provider.choices)
+    token_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    contact = models.ForeignKey(
+        "monitoring.AlertContact",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "-created_at"])]
+
+    def __str__(self) -> str:
+        return f"{self.provider} link for {self.user_id}"
+
+
+class BotState(models.Model):
+    """Tiny key/number store: where the Telegram poller left off."""
+
+    key = models.CharField(max_length=40, primary_key=True)
+    value = models.BigIntegerField(default=0)
+
+    def __str__(self) -> str:
+        return f"{self.key}={self.value}"

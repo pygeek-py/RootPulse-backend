@@ -59,7 +59,9 @@ Per this session's own safety rules, I don't create accounts on third-party serv
 | **Cloudflare** | Worker probers (Phase 6) | Create a free account for Workers |
 | **Vercel** | Frontend hosting | Create a free account, connect the `RootPulse-frontend` repo |
 | **Resend** (or any SMTP) | Alert and sign-in email in production | Create a free account; put the SMTP settings in the host's environment. Locally the `.env` SMTP settings already send real mail |
-| **Slack / Discord / Telegram** | Alert channels (Phase 8) | Nothing to register: you create an incoming webhook (Slack, Discord) or a bot with @BotFather (Telegram) and paste it into Settings → Notifications |
+| **Telegram bot** | One-click Telegram (Phase 8) | Create one bot with @BotFather; set `TELEGRAM_BOT_TOKEN` (the rest is automatic) |
+| **Discord app** | One-click Discord | Create one application at discord.com/developers; set `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` and the redirect URL |
+| **Slack app** | One-click Slack | Create one app at api.slack.com/apps; set `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` and the redirect URL (https only) |
 | **VAPID keys** | Browser push (Phase 8) | Run `python manage.py generate_vapid_keys` and put both values in `.env` / the host's environment |
 | **Sentry** | Error tracking | Create a free account + project |
 | **GitHub** | Remote repos + CI/CD + the scheduler-trigger cron workflow (Phase 6) | Create the `RootPulse-backend`/`RootPulse-frontend` repos, push these local commits, add secrets for the CI/cron workflows |
@@ -150,7 +152,15 @@ Secrets (webhook URLs, bot tokens, push keys) are masked in every response and n
 
 API: `/api/v1/alert-contacts/` (CRUD, `test`, `verify`, `resend-verification`, `rotate-secret`, `telegram-chats`; capped at 20 per user), `/api/v1/notifications/` (delivery history, filterable by status, monitor, contact, incident), `/api/v1/notifications/vapid-key/`, `/api/v1/maintenance-windows/` (CRUD, `?state=`), `POST /api/v1/monitors/{id}/test-notification/`, and monitors take `alert_contact_ids` (omit it on create to use all your contacts). Incident detail lists its `notifications`.
 
+### One-click connections
+
+Pasting webhook URLs and bot tokens is how developers connect things, so Telegram, Discord and Slack also have a **Connect** button (`notifications/integrations.py`). Each is optional and appears only when the server has its credentials; the paste-it-yourself route always remains.
+
+- **Telegram** uses *one* bot owned by the deployment. `POST /integrations/telegram/start/` returns a `t.me` deep link carrying a random one-time token (only its hash is stored; it works once and expires in 15 minutes). When the person presses Start, the bot receives `/start <token>` *from their chat*, which is how we know whose chat it is, and a contact is created and attached to their existing monitors. `GET /integrations/telegram/links/{id}/` is what the page polls. In development the server polls Telegram itself (`run_engine` and that status call); in production Telegram posts updates to `/integrations/telegram/webhook/`, gated by a shared secret (`manage.py telegram_webhook set|info|delete`). The deep link also works for groups (`startgroup`). A chat connected this way stores no token (it is sent by the deployment's bot), and the API refuses to let anyone create or repoint such a contact by hand, so the bot can't be aimed at arbitrary chat ids.
+- **Discord and Slack** use OAuth. `POST /integrations/{discord|slack}/start/` returns the provider's authorize URL with a signed, 10-minute `state`; the provider redirects the browser to `/integrations/{provider}/callback/`, which verifies the state, exchanges the code for an incoming-webhook URL, validates it with the same rules as a typed one, creates the contact and redirects to `/settings/notifications?connected=...` (or `?connect_error=...` with a short code, never provider text). The webhook URL and the OAuth code never appear in redirects or logs.
+- Discord and Slack apps are created once by whoever runs the deployment: see the variables in `.env.example`. Register `<API_PUBLIC_URL>/api/v1/integrations/<provider>/callback/` as the redirect URL (Slack requires https, so Slack connect works once the API is deployed or behind an https tunnel).
+
 Not built yet: recurring maintenance windows (`recurrence_rule` is stored but ignored), and per-severity routing.
 
-Tests: 655 in total (the thread-pool dispatch test runs only on Postgres). Per-channel tests use stubbed HTTP, so no test touches the network.
+Tests: 726 in total (the thread-pool dispatch test runs only on Postgres). Per-channel tests use stubbed HTTP, so no test touches the network.
 

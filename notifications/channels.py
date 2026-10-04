@@ -353,9 +353,13 @@ class TelegramChannel(Channel):
         return {"bot_token": token, "chat_id": chat}
 
     def summary(self, config):
+        if config.get("managed"):  # connected with one click; there is no token to hide
+            return f"Chat: {config.get('chat_title') or config.get('chat_id', '')}"
         return f"Chat {config.get('chat_id', '')}"
 
     def public(self, config):
+        if config.get("managed"):
+            return {"connected": True, "chat": config.get("chat_title", "")}
         token = config.get("bot_token", "")
         return {"bot_token": token.split(":")[0] + ":••••", "chat_id": config.get("chat_id", "")}
 
@@ -377,8 +381,13 @@ class TelegramChannel(Channel):
                 "disable_web_page_preview": True,
             }
         ).encode()
+        # A chat connected through RootPulse is served by the deployment's own bot; one a
+        # person set up by hand carries its own token.
+        token = settings.TELEGRAM_BOT_TOKEN if config.get("managed") else config["bot_token"]
+        if not token:
+            raise DeliveryError("Telegram isn't set up on this server", retryable=False)
         response = post_json(
-            f"{TELEGRAM_API}/bot{config['bot_token']}/sendMessage",
+            f"{TELEGRAM_API}/bot{token}/sendMessage",
             body,
             {"Content-Type": "application/json"},
         )

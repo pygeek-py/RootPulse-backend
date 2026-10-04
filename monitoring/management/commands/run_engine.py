@@ -11,6 +11,7 @@ from django.db import OperationalError, connections
 
 from monitoring.engine import run_scheduler_once
 from notifications.dispatcher import run_notifications_once
+from notifications.integrations import poll_once
 
 
 class Command(BaseCommand):
@@ -26,6 +27,7 @@ class Command(BaseCommand):
             try:
                 checks = run_scheduler_once().as_dict()
                 alerts = run_notifications_once().as_dict()
+                poll_once()  # development: pick up "Connect Telegram" presses (no-op in production)
             except OperationalError as exc:
                 if not options.get("loop"):
                     raise

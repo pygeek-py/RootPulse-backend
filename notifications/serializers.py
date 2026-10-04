@@ -95,6 +95,20 @@ class AlertContactSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"channel": "Choose a channel."})
 
         incoming = attrs.get("config")
+        # A Telegram chat connected through RootPulse is served by this deployment's own bot.
+        # Letting a request claim that for an arbitrary chat id would turn the bot into a spam
+        # cannon, so only the connect flow may create or change one.
+        if isinstance(incoming, dict) and ({"managed", "chat_title"} & set(incoming)):
+            raise serializers.ValidationError(
+                {"config.managed": "Not a setting you can choose. Use Connect Telegram."}
+            )
+        if editing and self.instance.config.get("managed") and incoming is not None:
+            raise serializers.ValidationError(
+                {
+                    "config": "This chat was connected through RootPulse. Delete it and "
+                    "connect again to change it."
+                }
+            )
         if incoming is not None or not editing:
             if not isinstance(incoming, dict):
                 raise serializers.ValidationError(

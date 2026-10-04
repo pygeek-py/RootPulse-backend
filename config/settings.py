@@ -187,6 +187,9 @@ REST_FRAMEWORK = {
         "auth_refresh": "30/min",
         "notify_test": "10/min",  # each one sends a real alert
         "contact_verify": "10/hour",
+        "integration_connect": "30/hour",  # starting a Telegram/Discord/Slack connection
+        "integration_poll": "120/min",  # the page asking "did the Telegram link finish yet?"
+        "integration_callback": "30/min",
         "heartbeat": "120/min",  # per source IP; a job normally pings once per run
         "auth_github": "20/min",
     },
@@ -306,6 +309,22 @@ MAX_ALERT_CONTACTS_PER_USER = int(os.environ.get("MAX_ALERT_CONTACTS_PER_USER", 
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
 VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:alerts@rootpulse.dev")
+
+# One-click connections (notifications/integrations.py). Each is optional: a channel whose
+# credentials are missing simply doesn't offer "Connect", and people can still paste a
+# webhook URL or their own bot token.
+#   Telegram: ONE bot owned by this deployment (created with @BotFather). Locally it is polled;
+#   in production set TELEGRAM_WEBHOOK_SECRET and run `manage.py telegram_webhook set`.
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "").lstrip("@")
+TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
+#   Discord and Slack: one OAuth app each. The redirect URL to register is
+#   <API_PUBLIC_URL>/api/v1/integrations/<discord|slack>/callback/
+DISCORD_CLIENT_ID = os.environ.get("DISCORD_CLIENT_ID", "")
+DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "")
+SLACK_CLIENT_ID = os.environ.get("SLACK_CLIENT_ID", "")
+SLACK_CLIENT_SECRET = os.environ.get("SLACK_CLIENT_SECRET", "")
+INTEGRATION_LINK_TTL_SECONDS = 15 * 60
 
 # Passwordless sign-in (accounts/passwordless.py).
 EMAIL_CHALLENGE_TTL_SECONDS = 15 * 60
