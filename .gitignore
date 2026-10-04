@@ -27,3 +27,6 @@ Thumbs.db
 # Fly.io
 fly.toml.bak
 workers/**/node_modules
+
+# local dev server logs
+.logs/
