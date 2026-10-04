@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from django.conf import settings
-from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema_field
 from rest_framework import serializers
 
@@ -55,7 +54,7 @@ class MonitorSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-    @extend_schema_field(OpenApiTypes.URI)
+    @extend_schema_field({"type": "string", "format": "uri", "nullable": True})
     def get_heartbeat_url(self, obj: Monitor) -> str | None:
         if not obj.heartbeat_token:
             return None

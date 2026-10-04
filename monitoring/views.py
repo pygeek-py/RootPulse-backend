@@ -62,6 +62,8 @@ class MonitorViewSet(
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]  # no PUT
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):  # schema generation has no user
+            return Monitor.objects.none()
         qs = Monitor.objects.filter(user=self.request.user)
         params = self.request.query_params
 
