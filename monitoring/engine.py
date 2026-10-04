@@ -194,6 +194,7 @@ class Engine:
         summary.bump("checked")
 
         new_status = monitor.status
+        confirmations: list[Check] = []
         if primary.success is True:
             new_status = Monitor.Status.UP
             summary.bump("up")
@@ -206,16 +207,22 @@ class Engine:
             else:
                 confirmed, extra = self._confirm(monitor, primary)
                 for extra_region, extra_result in extra:
-                    _record(monitor, extra_result, started, extra_region, confirmation=True)
+                    confirmations.append(
+                        _record(monitor, extra_result, started, extra_region, confirmation=True)
+                    )
                 if confirmed:
                     new_status = Monitor.Status.DOWN
                     summary.bump("down")
                 else:
                     summary.bump("blips")  # a blip: logged, no action
 
-        self._apply(monitor, primary, primary_check, new_status, state_patch, started)
+        self._apply(
+            monitor, primary, primary_check, new_status, state_patch, started, confirmations
+        )
 
-    def _apply(self, monitor, primary, check, new_status, state_patch, started) -> None:
+    def _apply(
+        self, monitor, primary, check, new_status, state_patch, started, confirmations=()
+    ) -> None:
         """Write the monitor's new state, unless the user changed or paused it meanwhile."""
         fields: dict = {
             "last_check_at": started,
@@ -234,13 +241,18 @@ class Engine:
                 (monitor.config or {}).get("grace_period_seconds", 300),
             )
 
-        updated = (
-            Monitor.objects.filter(pk=monitor.pk, updated_at=monitor.updated_at)
-            .exclude(status=Monitor.Status.PAUSED)
-            .update(**fields)
-        )
-        if updated and new_status != monitor.status:
-            hooks.status_changed(monitor, monitor.status, new_status, check)
+        # The status change and its incident are one unit: if opening or closing the
+        # incident fails, the status change rolls back with it and the next pass retries.
+        with transaction.atomic():
+            updated = (
+                Monitor.objects.filter(pk=monitor.pk, updated_at=monitor.updated_at)
+                .exclude(status=Monitor.Status.PAUSED)
+                .update(**fields)
+            )
+            if updated:
+                if new_status != monitor.status:
+                    hooks.status_changed(monitor, monitor.status, new_status, check)
+                hooks.reconcile_incident(monitor, new_status, check, confirmations)
 
 
 # --- the pass -------------------------------------------------------------

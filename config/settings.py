@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     # Local
     "accounts",
     "monitoring",
+    "incidents",
 ]
 
 MIDDLEWARE = [
@@ -212,6 +213,9 @@ SIMPLE_JWT = {
 # CORS — explicit allowlist only, never a wildcard (docs/plan/04-security.md #8).
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 CORS_ALLOW_CREDENTIALS = True
+# Browsers hide most response headers from cross-origin scripts. The frontend needs this one
+# to name a downloaded CSV.
+CORS_EXPOSE_HEADERS = ["Content-Disposition"]
 
 
 # Auth (docs/plan/04-security.md #1, #7)

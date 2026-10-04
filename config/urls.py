@@ -18,6 +18,7 @@ urlpatterns = [
     path("health/", health, name="health"),
     path("api/v1/auth/", include("accounts.urls")),
     path("api/v1/monitors/", include("monitoring.urls")),
+    path("api/v1/incidents/", include("incidents.urls")),
     path("api/v1/heartbeat/<str:token>/", HeartbeatView.as_view(), name="heartbeat"),
     path("internal/run-due-checks/", RunDueChecksView.as_view(), name="run-due-checks"),
     path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),

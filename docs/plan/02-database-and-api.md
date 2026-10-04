@@ -62,10 +62,10 @@ REST, versioned under `/api/v1/`. DRF `ModelViewSet`s where CRUD is symmetric, p
 
 | Method | Route | Purpose | Auth | Request | Response | Errors |
 | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/incidents` | List (filter/sort) | JWT | query: `status`, `monitor_id`, `start_date`, `end_date`, `sort` | paginated `Incident[]` | 401 |
+| GET | `/incidents` | List (filter/sort; page-number paging so it can sort by duration) | JWT | query: `status`, `monitor_id`, `start_date`, `end_date`, `sort` | paginated `Incident[]` | 401 |
 | GET | `/incidents/{id}` | Detail incl. timeline (`IncidentEvent[]`), root-cause breakdown, linked deploy | JWT | — | `Incident` | 404 |
 | POST | `/incidents/{id}/comments` | Add comment | JWT | `body`, `visible_on_status_page` | `IncidentComment` | 400, 404 |
-| PATCH | `/incidents/{id}` | Exclude-from-reports toggle, manual close | JWT | `excluded_from_reports`? | `Incident` | 404 |
+| PATCH | `/incidents/{id}` | Exclude-from-reports toggle only. **No manual close:** an incident ends when the monitor recovers, is paused, or is edited (closing one by hand while the monitor is still failing would just reopen it on the next check) | JWT | `excluded_from_reports` | `Incident` | 404 |
 | POST | `/incidents/{id}/postmortem` | Generate pre-filled postmortem doc | JWT | — | postmortem markdown/structure | 404 |
 | GET | `/incidents/export` | CSV export | JWT | query: same filters as list | CSV file | 401 |
 

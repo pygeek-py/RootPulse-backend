@@ -4,6 +4,8 @@ from django.conf import settings
 from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema_field
 from rest_framework import serializers
 
+from incidents import services as incidents
+
 from . import target_validation as tv
 from .models import Check, Monitor
 from .services import first_check_due, summarize
@@ -147,9 +149,14 @@ class MonitorSerializer(serializers.ModelSerializer):
         if changed and instance.status != Monitor.Status.PAUSED:
             # New settings should be checked promptly; and a different target or
             # config means the old up/down verdict no longer applies.
+            was_down = instance.status == Monitor.Status.DOWN
             if changed & {"target", "config"}:
                 instance.status = Monitor.Status.PENDING
             instance.next_check_at = first_check_due(instance)
+            instance.save()
+            if was_down and instance.status == Monitor.Status.PENDING:
+                incidents.close_for_edit(instance)  # the old verdict no longer applies
+            return instance
         instance.save()
         return instance
 

@@ -106,3 +106,16 @@ What each type does:
 `GET /api/v1/monitors/{id}/checks/` is cursor-paginated (`since`, `until`, `region`, `confirmation`), and the monitor detail includes a 24-hour `summary` (uptime, average and p95 response time). Raw checks are only read over short windows; long-range analytics will come from rollups (Phase 12), and a retention sweep for checks older than 90 days arrives with them.
 
 Tests: `python -m pytest` (432). The real row-lock race and the thread pool run only on Postgres (`TEST_DATABASE=postgres`, which CI uses); the Worker's 26 tests run with `npm test` in `workers/prober`.
+
+## Incidents (Phase 7)
+
+An **incident** is a confirmed outage. `incidents/services.py:reconcile` runs inside the same transaction as every status change, so **a monitor is down exactly when it has one open incident**:
+
+- It opens when a failure is confirmed (the engine's two-region or re-check rule) and closes on the next successful check ("recovered"). It also closes if the monitor is **paused** (nothing can observe the outage any more) or **edited** (the old verdict no longer applies). There is deliberately no manual close.
+- **One open incident per monitor is a database constraint** (a partial unique index), not just application logic, so a flaky network, several regions agreeing, or a retried pass can't create duplicates. If opening or closing the incident fails, the status change rolls back with it and the next pass retries.
+- It self-heals: a monitor that is down with no incident (for example from before incidents existed) gets one on its next failing check, and a stale open incident on an up monitor is closed by the next success.
+- Timeline events (`opened`, `recheck_confirmed`, `resolved`, `closed_paused`, `closed_edited`, `excluded`, `included`) are written by the system; people add **comments** (private by default, with a flag for the future public status page).
+
+API under `/api/v1/incidents/`: list (`status`, `monitor_id`, `start_date`/`end_date` read in the account's time zone, `excluded`, `sort` incl. by duration), detail (timeline, comments, the check that opened it), `PATCH` (exclude from reports), comments (`POST`, and `PATCH`/`DELETE` on your own), `POST {id}/postmortem/` (a pre-filled Markdown draft, once resolved), and `GET export/` (CSV with the same filters; cells that start with `=`, `+`, `-` or `@` are neutralised so a spreadsheet can't run them). `CORS_EXPOSE_HEADERS` includes `Content-Disposition` so the frontend can read the download's filename. Incidents can't be created or deleted through the API.
+
+Tests: 490 in total, including the full failure, confirm, incident, recovery state machine, a real unstable local HTTP server (one incident across several broken passes; a single flaky response opens none), and the constraint on real Postgres (`TEST_DATABASE=postgres`). Root-cause stage and deploy linking arrive in Phase 10.

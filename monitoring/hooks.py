@@ -21,3 +21,10 @@ def status_changed(monitor: Monitor, old: str, new: str, check: Check) -> None:
     logger.info(
         "monitor %s (%s): %s -> %s (%s)", monitor.id, monitor.name, old, new, check.status_detail
     )
+
+
+def reconcile_incident(monitor: Monitor, new_status: str, check: Check, confirmations=()) -> None:
+    """Keep the monitor's incident in step with its status (see incidents/services.py)."""
+    from incidents import services  # imported here: incidents depends on monitoring, not vice versa
+
+    services.reconcile(monitor, new_status, check, confirmations)

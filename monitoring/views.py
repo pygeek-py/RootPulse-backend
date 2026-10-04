@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Q
 from django.utils.dateparse import parse_datetime
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
@@ -10,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from accounts.services import audit
+from incidents import services as incidents
 
 from .models import Check, Monitor
 from .serializers import (
@@ -121,9 +123,11 @@ class MonitorViewSet(
     def pause(self, request, pk=None):
         monitor = self.get_object()
         if monitor.status != Monitor.Status.PAUSED:
-            monitor.status = Monitor.Status.PAUSED
-            monitor.next_check_at = None  # never due while paused
-            monitor.save(update_fields=["status", "next_check_at", "updated_at"])
+            with transaction.atomic():
+                monitor.status = Monitor.Status.PAUSED
+                monitor.next_check_at = None  # never due while paused
+                monitor.save(update_fields=["status", "next_check_at", "updated_at"])
+                incidents.close_for_pause(monitor)  # nothing can observe the outage any more
         return Response(self.get_serializer(monitor).data)
 
     @extend_schema(tags=["monitors"], request=None, responses={200: MonitorSerializer})
