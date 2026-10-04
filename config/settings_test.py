@@ -33,3 +33,8 @@ PROBER_URLS = ""
 PROBER_SHARED_SECRET = ""
 SCHEDULER_SHARED_SECRET = "test-scheduler-secret"
 PRIMARY_REGION = "primary"
+
+# Notifications: no waiting, no real push keys.
+NOTIFY_BACKOFF_SECONDS = (60, 300, 900, 900)
+VAPID_PRIVATE_KEY = ""
+VAPID_PUBLIC_KEY = ""

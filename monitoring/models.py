@@ -7,7 +7,8 @@ from django.db.models import F, Q
 
 
 class AlertContact(models.Model):
-    """A reusable notification destination. Endpoints and delivery arrive in Phase 8."""
+    """A reusable notification destination (a place to send alerts). Validated per
+    channel in notifications/channels.py; delivery lives in the notifications app."""
 
     class Channel(models.TextChoices):
         EMAIL = "email", "Email"
@@ -23,10 +24,20 @@ class AlertContact(models.Model):
     )
     name = models.CharField(max_length=120)
     channel = models.CharField(max_length=16, choices=Channel.choices)
-    # Shape depends on the channel (webhook URL, chat ID, ...); validated per channel in Phase 8.
+    # Shape depends on the channel (address, webhook URL, bot token + chat id, ...).
     config = models.JSONField(default=dict, blank=True)
+    # Wait this long after an incident opens and only alert if it is still down: filters
+    # out outages shorter than the delay. 0 = alert immediately.
     delay_seconds = models.PositiveIntegerField(default=0)
+    # While the incident stays open, remind again this often. 0 = never.
     repeat_interval_seconds = models.PositiveIntegerField(default=0)
+    enabled = models.BooleanField(default=True)
+    # An address we can't prove belongs to the user (email to someone else) must be
+    # verified before it gets alerts, so RootPulse can't be used to spam strangers.
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verification_hash = models.CharField(max_length=64, blank=True)
+    verification_expires_at = models.DateTimeField(null=True, blank=True)
+    verification_attempts = models.PositiveSmallIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

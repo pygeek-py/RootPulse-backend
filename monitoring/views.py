@@ -8,6 +8,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import CursorPagination, PageNumberPagination
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.viewsets import GenericViewSet
 
 from accounts.services import audit
@@ -19,6 +20,7 @@ from .serializers import (
     CheckSerializer,
     MonitorDetailSerializer,
     MonitorSerializer,
+    MonitorTestNotificationSerializer,
 )
 from .services import first_check_due
 
@@ -77,11 +79,13 @@ class MonitorViewSet(
     serializer_class = MonitorSerializer
     pagination_class = MonitorPagination
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]  # no PUT
+    # test_notification opts in to a rate limit; the rest of the viewset has none.
+    throttle_scope: str | None = None
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):  # schema generation has no user
             return Monitor.objects.none()
-        qs = Monitor.objects.filter(user=self.request.user)
+        qs = Monitor.objects.filter(user=self.request.user).prefetch_related("alert_contacts")
         params = self.request.query_params
 
         if value := params.get("status"):
@@ -140,6 +144,49 @@ class MonitorViewSet(
             monitor.next_check_at = first_check_due(monitor)
             monitor.save(update_fields=["status", "next_check_at", "updated_at"])
         return Response(self.get_serializer(monitor).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=["monitors"],
+        request=None,
+        responses={200: MonitorTestNotificationSerializer},
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="test-notification",
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="notify_test",
+    )
+    def test_notification(self, request, pk=None):
+        """Send a test alert to every contact attached to this monitor, as a real one would be."""
+        from notifications import services as notify
+        from notifications.views import send_now
+
+        monitor = self.get_object()
+        results = []
+        for contact in monitor.alert_contacts.filter(enabled=True).order_by("created_at"):
+            if not notify.deliverable(contact):
+                results.append(
+                    {
+                        "contact_id": contact.id,
+                        "contact_name": contact.name,
+                        "channel": contact.channel,
+                        "status": "skipped",
+                        "error": "Confirm this email address first.",
+                    }
+                )
+                continue
+            status_, error = send_now(notify.create_test(contact, monitor))
+            results.append(
+                {
+                    "contact_id": contact.id,
+                    "contact_name": contact.name,
+                    "channel": contact.channel,
+                    "status": status_,
+                    "error": error,
+                }
+            )
+        return Response({"results": results})
 
     @extend_schema(
         tags=["monitors"],

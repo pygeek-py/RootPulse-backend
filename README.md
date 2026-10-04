@@ -58,7 +58,9 @@ Per this session's own safety rules, I don't create accounts on third-party serv
 | **Render** | API hosting | Create a free account, connect the `RootPulse-backend` repo (or give me an API key) — `render.yaml` + `Dockerfile` are ready |
 | **Cloudflare** | Worker probers (Phase 6) | Create a free account for Workers |
 | **Vercel** | Frontend hosting | Create a free account, connect the `RootPulse-frontend` repo |
-| **Resend** | Transactional email (Phase 8) | Create a free account, give me the API key |
+| **Resend** (or any SMTP) | Alert and sign-in email in production | Create a free account; put the SMTP settings in the host's environment. Locally the `.env` SMTP settings already send real mail |
+| **Slack / Discord / Telegram** | Alert channels (Phase 8) | Nothing to register: you create an incoming webhook (Slack, Discord) or a bot with @BotFather (Telegram) and paste it into Settings → Notifications |
+| **VAPID keys** | Browser push (Phase 8) | Run `python manage.py generate_vapid_keys` and put both values in `.env` / the host's environment |
 | **Sentry** | Error tracking | Create a free account + project |
 | **GitHub** | Remote repos + CI/CD + the scheduler-trigger cron workflow (Phase 6) | Create the `RootPulse-backend`/`RootPulse-frontend` repos, push these local commits, add secrets for the CI/cron workflows |
 
@@ -118,4 +120,37 @@ An **incident** is a confirmed outage. `incidents/services.py:reconcile` runs in
 
 API under `/api/v1/incidents/`: list (`status`, `monitor_id`, `start_date`/`end_date` read in the account's time zone, `excluded`, `sort` incl. by duration), detail (timeline, comments, the check that opened it), `PATCH` (exclude from reports), comments (`POST`, and `PATCH`/`DELETE` on your own), `POST {id}/postmortem/` (a pre-filled Markdown draft, once resolved), and `GET export/` (CSV with the same filters; cells that start with `=`, `+`, `-` or `@` are neutralised so a spreadsheet can't run them). `CORS_EXPOSE_HEADERS` includes `Content-Disposition` so the frontend can read the download's filename. Incidents can't be created or deleted through the API.
 
-Tests: 490 in total, including the full failure, confirm, incident, recovery state machine, a real unstable local HTTP server (one incident across several broken passes; a single flaky response opens none), and the constraint on real Postgres (`TEST_DATABASE=postgres`). Root-cause stage and deploy linking arrive in Phase 10.
+Tests: 490 at that point, including the full failure, confirm, incident, recovery state machine, a real unstable local HTTP server (one incident across several broken passes; a single flaky response opens none), and the constraint on real Postgres (`TEST_DATABASE=postgres`). Root-cause stage and deploy linking arrive in Phase 10.
+
+## Notifications (Phase 8)
+
+An incident event becomes a row in `NotificationDelivery`, which doubles as the **send queue** and the **history**: `run_notifications_once` claims due rows with `select_for_update(skip_locked)` (the same pattern as the scheduler), sends outside any lock, and records what happened. The same signed `/internal/run-due-checks/` trigger runs checks and then alerts, so production needs no extra cron. Locally, `python manage.py run_engine --loop 60` does both.
+
+**Who hears what, and when** (`notifications/services.py` is the one place these rules live):
+
+- An incident **opening** alerts every *enabled, confirmed* contact attached to the monitor, after that contact's **delay** (0 to 1 hour), and only if the monitor is *still* down then. A blip shorter than the delay sends nothing.
+- **Recovery** is announced only to contacts who were actually told it went down. If the down-alert hadn't gone out yet (still inside the delay, or failing), it is cancelled instead: nobody gets an "all clear" for an alarm they never heard.
+- While an incident stays open, a contact with a **reminder interval** (5 minutes to 24 hours) is reminded, at most `NOTIFY_MAX_REMINDERS` (24) times.
+- **Maintenance windows** silence everything: the scheduler doesn't check those monitors, an incident that opens inside one creates only *skipped* rows, and a window that starts before a queued alert goes out suppresses it at send time.
+- Pausing or editing a monitor cancels alerts still waiting. Creation is idempotent (`dedupe_key` plus a unique constraint), so a retried pass can never alert twice.
+- Failures are classified. A temporary one (timeout, 5xx, 429 with the provider's own `Retry-After`) is retried after 1, 5, 15, 15 minutes, up to `NOTIFY_MAX_ATTEMPTS` (5); a permanent one (bad credentials, deleted webhook, refused address) fails at once with a message a person can act on. A crashed adapter is retried, never lost. A claimed row that is never finished (the process died) becomes due again after a two-minute lease. Every send and failure is also written to the incident's timeline.
+
+**Six channels** (`notifications/channels.py`), each validating its own config when it is saved so a typo is caught then, not at 3 a.m.:
+
+| Channel | Notes |
+| --- | --- |
+| Email | An address other than the account's must be confirmed first (a 6-digit code emailed there: 30 minutes, 5 tries), so RootPulse can't be pointed at a stranger's inbox. Subjects and bodies are HTML-escaped. |
+| Webhook | A JSON POST signed with an HMAC-SHA256 secret that RootPulse generates (`X-RootPulse-Signature: t=..,v1=..`, the same scheme as the internal endpoints, with `X-RootPulse-Event` and `X-RootPulse-Delivery`). The secret is shown **once** (create or rotate) and never returned again. The URL is user-supplied, so sends use `safe_post`: the name is resolved and judged, the connection is pinned to the vetted IP, redirects are never followed, and the config is SSRF-checked when saved. |
+| Slack | Only `hooks.slack.com` webhook URLs. Names and messages are escaped (`<!channel>` can't ping anyone). |
+| Discord | Only `discord.com` webhook URLs, with `allowed_mentions` off (`@everyone` can't ping the server). |
+| Telegram | Your own bot token plus a chat id. `POST /alert-contacts/telegram-chats/` lists the chats that have messaged the bot, so nobody has to hunt for a numeric id. |
+| Web push | VAPID via `pywebpush`. Subscriptions are accepted only for the real push services (FCM, Mozilla, Windows, Apple). An expired subscription (404/410) switches the contact off. |
+
+Secrets (webhook URLs, bot tokens, push keys) are masked in every response and never appear in error messages, logs or the delivery history.
+
+API: `/api/v1/alert-contacts/` (CRUD, `test`, `verify`, `resend-verification`, `rotate-secret`, `telegram-chats`; capped at 20 per user), `/api/v1/notifications/` (delivery history, filterable by status, monitor, contact, incident), `/api/v1/notifications/vapid-key/`, `/api/v1/maintenance-windows/` (CRUD, `?state=`), `POST /api/v1/monitors/{id}/test-notification/`, and monitors take `alert_contact_ids` (omit it on create to use all your contacts). Incident detail lists its `notifications`.
+
+Not built yet: recurring maintenance windows (`recurrence_rule` is stored but ignored), and per-severity routing.
+
+Tests: 655 in total (the thread-pool dispatch test runs only on Postgres). Per-channel tests use stubbed HTTP, so no test touches the network.
+

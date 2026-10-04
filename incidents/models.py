@@ -73,7 +73,9 @@ class IncidentEvent(models.Model):
         CLOSED_EDITED = "closed_edited", "Closed: monitor changed"
         EXCLUDED = "excluded", "Excluded from reports"
         INCLUDED = "included", "Included in reports"
-        # Added by later phases: notification_sent, deploy_linked.
+        NOTIFICATION_SENT = "notification_sent", "Alert sent"
+        NOTIFICATION_FAILED = "notification_failed", "Alert failed"
+        # Added by a later phase: deploy_linked.
 
     id = models.BigAutoField(primary_key=True)
     incident = models.ForeignKey(Incident, on_delete=models.CASCADE, related_name="events")

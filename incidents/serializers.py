@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from monitoring.models import Monitor
 from monitoring.serializers import CheckSerializer
+from notifications.serializers import DeliverySerializer
 
 from . import services
 from .models import Incident, IncidentComment, IncidentEvent
@@ -101,10 +102,22 @@ class IncidentDetailSerializer(IncidentSerializer):
     events = IncidentEventSerializer(many=True, read_only=True)
     comments = serializers.SerializerMethodField()
     opening_check = CheckSerializer(source="opened_by", read_only=True, allow_null=True)
+    notifications = serializers.SerializerMethodField()
 
     class Meta(IncidentSerializer.Meta):
-        fields = [*IncidentSerializer.Meta.fields, "events", "comments", "opening_check"]
+        fields = [
+            *IncidentSerializer.Meta.fields,
+            "events",
+            "comments",
+            "opening_check",
+            "notifications",
+        ]
         read_only_fields = fields
+
+    @extend_schema_field(DeliverySerializer(many=True))
+    def get_notifications(self, obj: Incident):
+        deliveries = obj.deliveries.select_related("monitor").order_by("created_at", "id")
+        return DeliverySerializer(deliveries, many=True).data
 
     @extend_schema_field(CommentSerializer(many=True))
     def get_comments(self, obj: Incident):

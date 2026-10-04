@@ -96,6 +96,8 @@ class TestScheduleTrigger:
         assert body["claimed"] == 1 and body["checked"] == 1 and body["up"] == 1
         monitor.refresh_from_db()
         assert monitor.status == "up"
+        # The same trigger sends the alerts those checks caused.
+        assert set(body["notifications"]) >= {"claimed", "sent", "retrying", "failed", "skipped"}
 
     def test_it_is_not_in_the_public_api_docs(self, client):
         schema = client.get("/api/v1/schema/", HTTP_ACCEPT="application/json").json()

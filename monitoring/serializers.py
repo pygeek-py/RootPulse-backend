@@ -7,7 +7,7 @@ from rest_framework import serializers
 from incidents import services as incidents
 
 from . import target_validation as tv
-from .models import Check, Monitor
+from .models import AlertContact, Check, Monitor
 from .services import first_check_due, summarize
 from .types import CONFIG_SERIALIZERS, SPECS
 
@@ -23,8 +23,24 @@ class MonitorConfigField(serializers.JSONField):
     """Per-type settings. Validated against the serializer for the monitor's `type`."""
 
 
+class OwnContactsField(serializers.PrimaryKeyRelatedField):
+    """Only the signed-in user's own alert contacts can be attached."""
+
+    def get_queryset(self):
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return AlertContact.objects.none()
+        return AlertContact.objects.filter(user=request.user)
+
+
 class MonitorSerializer(serializers.ModelSerializer):
     config = MonitorConfigField(required=False)
+    alert_contact_ids = OwnContactsField(
+        many=True,
+        required=False,
+        source="alert_contacts",
+        help_text="Contacts alerted about this monitor. Omit on create to use all of yours.",
+    )
     target = serializers.CharField(max_length=2048, required=False, allow_blank=True)
     heartbeat_url = serializers.SerializerMethodField()
 
@@ -44,6 +60,7 @@ class MonitorSerializer(serializers.ModelSerializer):
             "last_status_detail",
             "last_heartbeat_at",
             "heartbeat_url",
+            "alert_contact_ids",
             "created_at",
             "updated_at",
         ]
@@ -129,14 +146,23 @@ class MonitorSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        monitor = Monitor(user=self.context["request"].user, **validated_data)
+        contacts = validated_data.pop("alert_contacts", None)
+        user = self.context["request"].user
+        monitor = Monitor(user=user, **validated_data)
         if monitor.type == Monitor.Type.CRON:
             monitor.heartbeat_token = Monitor.new_heartbeat_token()
         monitor.next_check_at = first_check_due(monitor)
         monitor.save()
+        # Alerts on by default: a monitor nobody hears about is the worst kind of silent.
+        monitor.alert_contacts.set(
+            AlertContact.objects.filter(user=user) if contacts is None else contacts
+        )
         return monitor
 
     def update(self, instance: Monitor, validated_data):
+        contacts = validated_data.pop("alert_contacts", None)
+        if contacts is not None:
+            instance.alert_contacts.set(contacts)
         watched = {"target", "config", "interval_seconds"}
         changed = {
             field
@@ -210,3 +236,15 @@ class CheckPageSerializer(serializers.Serializer):
     next = serializers.URLField(allow_null=True)
     previous = serializers.URLField(allow_null=True)
     results = CheckSerializer(many=True)
+
+
+class MonitorTestResultSerializer(serializers.Serializer):
+    contact_id = serializers.UUIDField()
+    contact_name = serializers.CharField()
+    channel = serializers.CharField()
+    status = serializers.CharField()
+    error = serializers.CharField(allow_blank=True)
+
+
+class MonitorTestNotificationSerializer(serializers.Serializer):
+    results = MonitorTestResultSerializer(many=True)

@@ -168,6 +168,8 @@
 
 **Checkpoint:** a real Slack/Discord/Telegram message and a real email arrive within seconds of a confirmed incident.
 
+> **Status: built.** Everything above is implemented and tested against stubbed providers. The checkpoint needs real credentials (a Slack or Discord webhook, a Telegram bot) which only you can create; email already works locally. See the Notifications section of the README.
+
 ---
 
 ### Phase 9 — Analytics Dashboard

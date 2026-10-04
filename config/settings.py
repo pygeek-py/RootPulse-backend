@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "accounts",
     "monitoring",
     "incidents",
+    "notifications",
 ]
 
 MIDDLEWARE = [
@@ -184,6 +185,8 @@ REST_FRAMEWORK = {
         "auth_email_start": "20/hour",  # each one sends an email
         "auth_verify": "30/min",
         "auth_refresh": "30/min",
+        "notify_test": "10/min",  # each one sends a real alert
+        "contact_verify": "10/hour",
         "heartbeat": "120/min",  # per source IP; a job normally pings once per run
         "auth_github": "20/min",
     },
@@ -199,6 +202,11 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Uptime, incident & dependency monitoring — REST API v1.",
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "ENUM_NAME_OVERRIDES": {
+        "StatusEnum": "monitoring.models.Monitor.Status",
+        "DeliveryStatusEnum": "notifications.models.NotificationDelivery.Status",
+        "DeliveryEventEnum": "notifications.models.NotificationDelivery.Event",
+    },
 }
 
 SIMPLE_JWT = {
@@ -285,6 +293,19 @@ PROBER_SHARED_SECRET = os.environ.get("PROBER_SHARED_SECRET", "")
 # Signs the GitHub Actions call to /internal/run-due-checks/. Separate from the prober
 # secret so each can be rotated without the other.
 SCHEDULER_SHARED_SECRET = os.environ.get("SCHEDULER_SHARED_SECRET", "")
+
+# Notifications (notifications/).
+NOTIFY_MAX_ATTEMPTS = 5
+NOTIFY_BACKOFF_SECONDS = (60, 300, 900, 900)  # after attempt 1, 2, 3, 4 (docs/plan/03 section 5)
+NOTIFY_WORKERS = int(os.environ.get("NOTIFY_WORKERS", "8"))
+NOTIFY_BATCH_SIZE = int(os.environ.get("NOTIFY_BATCH_SIZE", "100"))
+NOTIFY_HTTP_TIMEOUT = 10
+NOTIFY_MAX_REMINDERS = 24  # a long outage reminds at most this many times
+MAX_ALERT_CONTACTS_PER_USER = int(os.environ.get("MAX_ALERT_CONTACTS_PER_USER", "20"))
+# Web push (VAPID). Generate once with: python manage.py generate_vapid_keys
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:alerts@rootpulse.dev")
 
 # Passwordless sign-in (accounts/passwordless.py).
 EMAIL_CHALLENGE_TTL_SECONDS = 15 * 60

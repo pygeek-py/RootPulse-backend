@@ -52,6 +52,11 @@ def open_incident(
             "check_id": check.id,
         },
     )
+    # Tell the monitor's contacts (after each one's configured delay). Same transaction as
+    # the incident, so there is never an incident nobody was queued to hear about.
+    from notifications import services as notify
+
+    notify.schedule_opened(incident)
     if confirmations:
         regions = sorted({c.region for c in confirmations} | {check.region})
         failed = sorted({check.region} | {c.region for c in confirmations if c.success is False})
@@ -101,7 +106,7 @@ def reconcile(
     if new_status == Monitor.Status.DOWN:
         open_incident(monitor, check, confirmations)
     elif new_status == Monitor.Status.UP:
-        close_incident(
+        closed = close_incident(
             monitor,
             kind=IncidentEvent.Kind.RESOLVED,
             resolution="recovered",
@@ -109,16 +114,28 @@ def reconcile(
             check=check,
             metadata={"check_id": check.id, "region": check.region},
         )
+        if closed is not None:
+            from notifications import services as notify
+
+            notify.schedule_resolved(closed)
 
 
 def close_for_pause(monitor: Monitor) -> None:
     """A paused monitor isn't checked, so its outage can no longer be observed."""
-    close_incident(monitor, kind=IncidentEvent.Kind.CLOSED_PAUSED, resolution="paused")
+    closed = close_incident(monitor, kind=IncidentEvent.Kind.CLOSED_PAUSED, resolution="paused")
+    if closed is not None:
+        from notifications import services as notify
+
+        notify.cancel_pending(closed, "The monitor was paused before this alert was sent.")
 
 
 def close_for_edit(monitor: Monitor) -> None:
     """Changing the target or config invalidates the verdict: start fresh."""
-    close_incident(monitor, kind=IncidentEvent.Kind.CLOSED_EDITED, resolution="edited")
+    closed = close_incident(monitor, kind=IncidentEvent.Kind.CLOSED_EDITED, resolution="edited")
+    if closed is not None:
+        from notifications import services as notify
+
+        notify.cancel_pending(closed, "The monitor was changed before this alert was sent.")
 
 
 def duration_seconds(incident: Incident, now: datetime | None = None) -> int:
