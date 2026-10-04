@@ -110,11 +110,11 @@ def normalize_hostname(raw: str) -> str:
 
 
 def _reject_internal_name(host: str) -> None:
+    if host == "localhost" or host.endswith(BLOCKED_SUFFIXES):
+        raise TargetRejected("Private and local host names can't be monitored.")
     if "." not in host:
         # Single-label names ("db", "redis") are resolved through internal search domains.
         raise TargetRejected("Use a fully qualified public host name (like example.com).")
-    if host == "localhost" or host.endswith(BLOCKED_SUFFIXES):
-        raise TargetRejected("Private and local host names can't be monitored.")
 
 
 # --- resolution -----------------------------------------------------------

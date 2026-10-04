@@ -77,6 +77,16 @@ class TestResolution:
             tv.resolve_public_ips("169.254.169.254")
 
 
+class TestMessages:
+    def test_localhost_gets_the_private_address_explanation(self):
+        with pytest.raises(tv.TargetRejected, match="Private and local"):
+            tv.validate_http_url("http://localhost:5432")
+
+    def test_bare_internal_names_ask_for_a_public_name(self):
+        with pytest.raises(tv.TargetRejected, match="fully qualified"):
+            tv.validate_public_host("redis")
+
+
 class TestHostSyntax:
     def test_normalises_case_and_trailing_dot(self):
         assert tv.validate_public_host("Example.COM.") == "example.com"

@@ -63,3 +63,13 @@ Per this session's own safety rules, I don't create accounts on third-party serv
 | **GitHub** | Remote repos + CI/CD + the scheduler-trigger cron workflow (Phase 6) | Create the `RootPulse-backend`/`RootPulse-frontend` repos, push these local commits, add secrets for the CI/cron workflows |
 
 Once any of these exist, tell me and I'll wire up the corresponding config/secrets immediately.
+
+## Monitors (Phase 5)
+
+`/api/v1/monitors/`: list (`q`, `status`, `type`, `sort`, `page`, `page_size`), create, retrieve, PATCH (no PUT), delete, `POST {id}/pause/` and `{id}/resume/`. Everything is scoped to the signed-in user (someone else's monitor is a 404) and capped at `MAX_MONITORS_PER_USER` (50).
+
+- **Eight types**, one table (`monitoring/types.py`) driving validation, defaults and the OpenAPI schema, where `config` is a typed `oneOf`. Check intervals are 5 minutes to 24 hours (SSL and domain: hourly or slower). A monitor's type can't change after creation. New monitors are `pending` with `next_check_at` set (a heartbeat's is its first expected ping plus grace); paused monitors have no `next_check_at`, which a database constraint enforces. Nothing checks them until Phase 6.
+- **SSRF** (`monitoring/target_validation.py`): names are resolved and the *addresses* judged, so loopback, private, link-local (cloud metadata), reserved and IPv6-embedded (mapped, NAT64, 6to4) addresses are refused, as are credentials in URLs, non-http(s) schemes, and single-label or `.local`/`.internal` names. Unresolvable names are allowed at creation (the site may not be live yet); `resolve_public_ips()` is the check-time entry point that re-validates and returns IPs to pin the connection to. `tests/fixtures/ssrf_cases.json` is the shared list the Cloudflare Worker implementation will also be tested against.
+- Heartbeat monitors get a secret URL (`/api/v1/heartbeat/{token}/`); receiving pings is added with the engine.
+- `AlertContact`, `MonitorAlertContact` and `MaintenanceWindow` models exist (admin only for now); their endpoints come with Phases 8 and 6.
+- Validation errors are flattened to dotted field paths (`config.timeout_seconds`). 271 tests.
