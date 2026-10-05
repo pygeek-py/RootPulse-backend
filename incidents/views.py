@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import logging
 import uuid
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -39,6 +40,8 @@ SORTS = {
     "duration": "duration",
     "-duration": "-duration",
 }
+
+logger = logging.getLogger(__name__)
 
 
 class IncidentPagination(PageNumberPagination):
@@ -174,6 +177,13 @@ class IncidentViewSet(
                     request.user,
                     incident_id=str(incident.id),
                 )
+            # Uptime figures leave out excluded incidents, so the hours it covers are redone.
+            try:
+                from analytics.rollups import recompute_for_incident
+
+                recompute_for_incident(incident)
+            except Exception:  # noqa: BLE001 - the toggle itself succeeded; the next run catches up
+                logger.exception("couldn't refresh rollups for incident %s", incident.id)
         incident = self.get_object()
         return Response(
             IncidentDetailSerializer(incident, context=self.get_serializer_context()).data

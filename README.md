@@ -162,5 +162,28 @@ Pasting webhook URLs and bot tokens is how developers connect things, so Telegra
 
 Not built yet: recurring maintenance windows (`recurrence_rule` is stored but ignored), and per-severity routing.
 
-Tests: 726 in total (the thread-pool dispatch test runs only on Postgres). Per-channel tests use stubbed HTTP, so no test touches the network.
+Tests: 726 in total (the thread-pool dispatch test runs only on Postgres).
+
+## Analytics (Phase 9)
+
+Dashboards never read raw checks (a 5-minute monitor from three regions writes ~860 a day). `analytics/` keeps three pre-aggregated tables, all UTC:
+
+| Table | Grain | Built from |
+| --- | --- | --- |
+| `CheckRollupHourly` | monitor x hour | raw scheduled checks (re-checks that confirm a failure are ignored) |
+| `CheckRollupDaily` | monitor x day | the hourly rows, not raw checks |
+| `FleetSummaryDaily` | user x day | the monitors' daily rows plus their incidents |
+
+Each row holds up/down/inconclusive counts, response-time statistics (count, sum, min, max, p50, p95 for successful checks) and the DNS/connection/TLS/server timing sums. **Every row is recomputed from its source and replaced, never added to**, so running the job twice (or overlapping with itself, or retrying) can't double count. That is tested directly: the same pass repeated leaves every table identical.
+
+- **Running it:** `python manage.py run_rollups_once` (`--full` rebuilds everything from each monitor's first check, `--no-prune` keeps old raw checks). In production the signed `POST /internal/run-rollups/` is called hourly by `.github/workflows/rollups.yml` (same secrets as the scheduler); locally `run_engine --loop` does it every ten minutes. One monitor failing doesn't stop the others.
+- **Retention:** raw checks older than `CHECK_RETENTION_DAYS` (90) are deleted *after* being folded in, and only for monitors whose rollup succeeded. Old hours are never recomputed from raw rows that may be gone, so history keeps its rollups.
+- **Honest uptime:** uptime is the share of conclusive checks that passed. Inconclusive checks (a problem on our side) never lower it, and an hour with no checks is "no data", not 100%. **Failures inside an incident you excluded from reports are left out of both sides**; toggling the exclusion recomputes the hours it covers, so the numbers follow immediately.
+- **Percentiles:** exact for an hour. A day, and any longer range, combines the hourly p50/p95 by a response-weighted mean, so they are close rather than exact (the UI says so).
+- **Incident figures** (count, downtime, MTTR, longest) come straight from incidents, which are few: downtime is clipped to the range, ongoing incidents count up to now, excluded ones are left out and counted separately.
+
+API: `GET /api/v1/monitors/{id}/analytics/?range=24h|7d|30d|90d` (hourly buckets up to a week, daily beyond; summary, response-time series, timing breakdown; the last two hours are refreshed on request so it is current without waiting for the job, which is the only raw-check read and is bounded to that window) and `GET /api/v1/analytics/fleet/?range=7d|30d|90d` (summary, a daily series, and the top offenders by downtime; read entirely from rollups, a fixed number of queries however long the range). The fleet figures can be up to an hour old (`data_as_of`).
+
+Tests: 792 in total, including rollup correctness against known synthetic checks (exact percentiles, hour boundaries, confirmation re-checks, exclusions, midnight-spanning incidents, retention), idempotency, and endpoint tests proving a month of history is served with no raw checks present and that no query touches raw checks outside the last 48 hours.
+ Per-channel tests use stubbed HTTP, so no test touches the network.
 

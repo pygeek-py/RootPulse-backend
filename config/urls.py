@@ -5,7 +5,7 @@ from django.http import JsonResponse
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-from monitoring.internal_views import HeartbeatView, RunDueChecksView
+from monitoring.internal_views import HeartbeatView, RunDueChecksView, RunRollupsView
 
 
 def health(request):
@@ -21,8 +21,10 @@ urlpatterns = [
     path("api/v1/maintenance-windows/", include("monitoring.maintenance_urls")),
     path("api/v1/incidents/", include("incidents.urls")),
     path("api/v1/", include("notifications.urls")),
+    path("api/v1/", include("analytics.urls")),
     path("api/v1/heartbeat/<str:token>/", HeartbeatView.as_view(), name="heartbeat"),
     path("internal/run-due-checks/", RunDueChecksView.as_view(), name="run-due-checks"),
+    path("internal/run-rollups/", RunRollupsView.as_view(), name="run-rollups"),
     path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/v1/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
 ]

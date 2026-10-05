@@ -1,0 +1,48 @@
+# Folds recent checks into the analytics rollups, once an hour (docs/plan/03-monitoring-engine.md
+# section 14). Dashboards read these rollups, never the raw checks, and this job also deletes raw
+# checks older than the retention window after they have been folded in.
+#
+# Same secrets as the scheduler:
+#   API_URL                   e.g. https://rootpulse-api.onrender.com  (no trailing slash)
+#   SCHEDULER_SHARED_SECRET   the same value as the API's SCHEDULER_SHARED_SECRET
+#
+# Safe to run twice, or while the scheduler is running: every rollup row is recomputed and
+# replaced, never added to.
+
+name: Rollups
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: rollups
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  run-rollups:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Trigger a rollup pass
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          SCHEDULER_SHARED_SECRET: ${{ secrets.SCHEDULER_SHARED_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${API_URL:-}" ] || [ -z "${SCHEDULER_SHARED_SECRET:-}" ]; then
+            echo "API_URL and SCHEDULER_SHARED_SECRET must be set as repository secrets." >&2
+            exit 1
+          fi
+
+          ts=$(date +%s)
+          sig=$(printf '%s.' "$ts" | openssl dgst -sha256 -hmac "$SCHEDULER_SHARED_SECRET" | sed 's/^.* //')
+
+          curl --fail-with-body --silent --show-error \
+            --max-time 300 --retry 2 --retry-delay 15 --retry-all-errors \
+            -X POST "$API_URL/internal/run-rollups/" \
+            -H "X-RootPulse-Signature: t=$ts,v1=$sig"
+          echo

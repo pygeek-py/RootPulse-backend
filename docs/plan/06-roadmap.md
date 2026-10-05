@@ -188,6 +188,8 @@
 
 **Checkpoint:** the fleet overview correctly identifies which monitor caused the most downtime this month.
 
+> **Status: built.** See the Analytics section of the README. The checkpoint is a test (three monitors with known incidents are ranked correctly, and a shorter range changes who is on top).
+
 ---
 
 ### Phase 10 — Deployment-Aware Incidents & Root-Cause Timing

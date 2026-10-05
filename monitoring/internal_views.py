@@ -56,6 +56,37 @@ class RunDueChecksView(APIView):
         return Response({**summary.as_dict(), "notifications": notifications.as_dict()})
 
 
+class RunRollupsView(APIView):
+    """`POST /internal/run-rollups/`: fold recent checks into the analytics rollups.
+
+    Same gate as the scheduler trigger (a signed, fresh timestamp). Called hourly by its own
+    GitHub Actions cron entry; running it more often, or twice at once, is harmless because
+    every rollup row is recomputed and replaced rather than added to.
+    """
+
+    authentication_classes: list = []
+    permission_classes = [AllowAny]
+    throttle_classes: list = []
+
+    def get_authenticate_header(self, request):
+        return "HMAC"
+
+    @extend_schema(exclude=True)
+    def post(self, request):
+        if not signing.verify(
+            settings.SCHEDULER_SHARED_SECRET,
+            request.headers.get(signing.HEADER),
+            request.body,
+        ):
+            return Response({"detail": "Unauthorized."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        from analytics.rollups import run_rollups_once
+
+        summary = run_rollups_once()
+        logger.info("rollup pass: %s", summary.as_dict())
+        return Response(summary.as_dict())
+
+
 class HeartbeatView(APIView):
     """`GET|POST|HEAD /api/v1/heartbeat/{token}/`: a job reporting that it ran.
 

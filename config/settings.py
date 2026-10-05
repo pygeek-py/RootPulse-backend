@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "monitoring",
     "incidents",
     "notifications",
+    "analytics",
 ]
 
 MIDDLEWARE = [
@@ -187,6 +188,7 @@ REST_FRAMEWORK = {
         "auth_refresh": "30/min",
         "notify_test": "10/min",  # each one sends a real alert
         "contact_verify": "10/hour",
+        "analytics": "60/min",
         "integration_connect": "30/hour",  # starting a Telegram/Discord/Slack connection
         "integration_poll": "120/min",  # the page asking "did the Telegram link finish yet?"
         "integration_callback": "30/min",
@@ -325,6 +327,12 @@ DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "")
 SLACK_CLIENT_ID = os.environ.get("SLACK_CLIENT_ID", "")
 SLACK_CLIENT_SECRET = os.environ.get("SLACK_CLIENT_SECRET", "")
 INTEGRATION_LINK_TTL_SECONDS = 15 * 60
+
+# Analytics (analytics/). Raw checks are kept this long (docs/plan/03 section 14); after that only
+# the rollups remain. Each rollup pass recomputes this many trailing hours, which also covers
+# checks that were written a little late.
+CHECK_RETENTION_DAYS = int(os.environ.get("CHECK_RETENTION_DAYS", "90"))
+ROLLUP_LOOKBACK_HOURS = 2
 
 # Passwordless sign-in (accounts/passwordless.py).
 EMAIL_CHALLENGE_TTL_SECONDS = 15 * 60

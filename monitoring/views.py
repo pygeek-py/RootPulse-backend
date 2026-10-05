@@ -12,6 +12,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.viewsets import GenericViewSet
 
 from accounts.services import audit
+from analytics.serializers import MonitorAnalyticsSerializer
 from incidents import services as incidents
 
 from .models import Check, Monitor
@@ -187,6 +188,26 @@ class MonitorViewSet(
                 }
             )
         return Response({"results": results})
+
+    @extend_schema(
+        tags=["monitors"],
+        parameters=[OpenApiParameter("range", enum=["24h", "7d", "30d", "90d"], default="7d")],
+        responses={200: MonitorAnalyticsSerializer},
+    )
+    @action(
+        detail=True,
+        methods=["get"],
+        throttle_classes=[ScopedRateThrottle],
+        throttle_scope="analytics",
+    )
+    def analytics(self, request, pk=None):
+        """Uptime, response-time trend, MTTR and timing, read from the rollups."""
+        from analytics import queries
+        from analytics.views import parse_range
+
+        monitor = self.get_object()
+        range_key = parse_range(request, queries.MONITOR_RANGES, "7d")
+        return Response(queries.monitor_analytics(monitor, range_key))
 
     @extend_schema(
         tags=["monitors"],
