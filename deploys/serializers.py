@@ -27,7 +27,13 @@ class DeploySourceSerializer(serializers.ModelSerializer):
         required=False,
         allow_blank=False,
         max_length=255,
-        help_text="Vercel and Render only: the secret the provider issued.",
+        help_text=(
+            "Vercel and Render only: the secret the provider shows once you have created the "
+            "webhook there. It can't exist before the webhook does, so this is added after."
+        ),
+    )
+    has_secret = serializers.SerializerMethodField(
+        help_text="False until a Vercel or Render connection has been given its signing secret."
     )
     deploy_count = serializers.IntegerField(read_only=True, default=0)
 
@@ -42,6 +48,7 @@ class DeploySourceSerializer(serializers.ModelSerializer):
             "enabled",
             "last_received_at",
             "deploy_count",
+            "has_secret",
             "secret",
             "signing_secret",
             "created_at",
@@ -51,6 +58,10 @@ class DeploySourceSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.CharField())
     def get_webhook_url(self, obj: DeploySource) -> str:
         return webhook_url(obj)
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_has_secret(self, obj: DeploySource) -> bool:
+        return bool(obj.secret)
 
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_secret(self, obj: DeploySource):
@@ -78,16 +89,14 @@ class DeploySourceSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"signing_secret": "RootPulse generates this secret for you."}
                 )
-        elif not editing and not provided:
-            raise serializers.ValidationError(
-                {"signing_secret": f"Paste the signing secret {kind.title()} gave you."}
-            )
         return attrs
 
     def create(self, validated_data):
         provided = validated_data.pop("signing_secret", None)
         kind = validated_data["type"]
-        secret = secrets.token_urlsafe(32) if kind in GENERATED else provided
+        # Vercel and Render only issue their secret once the webhook exists, and the webhook
+        # needs our address first, so such a source starts without one (and accepts nothing).
+        secret = secrets.token_urlsafe(32) if kind in GENERATED else (provided or "")
         return DeploySource.objects.create(secret=secret, **validated_data)
 
     def update(self, instance, validated_data):

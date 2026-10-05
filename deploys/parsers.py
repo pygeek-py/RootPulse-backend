@@ -294,4 +294,8 @@ PARSERS = {
 
 
 def verify_and_parse(source: DeploySource, headers, body: bytes) -> ParsedDeploy:
+    # A connection still waiting for its secret trusts nobody. (Without this, a signature made
+    # with an empty key would verify.)
+    if not source.secret:
+        raise Rejected(401, "Bad or missing signature.")
     return PARSERS[source.type](source, headers, body)

@@ -883,15 +883,31 @@ class TestDeploySourceApi:
 
     @pytest.mark.parametrize("kind", ["vercel", "render"])
     def test_vercel_and_render_use_the_providers_secret(self, auth_api, kind):
-        assert auth_api.post(SOURCES, {"name": "x", "type": kind}, format="json").status_code == 400
         resp = auth_api.post(
             SOURCES,
             {"name": "x", "type": kind, "signing_secret": "from-the-provider"},
             format="json",
         )
         assert resp.status_code == 201 and resp.json()["secret"] is None
+        assert resp.json()["has_secret"] is True
         assert DeploySource.objects.get().secret == "from-the-provider"
         assert "from-the-provider" not in resp.content.decode()
+
+    @pytest.mark.parametrize("kind", ["vercel", "render"])
+    def test_the_secret_can_come_after_the_webhook_exists(self, auth_api, kind):
+        # The provider only shows its secret once the webhook is created, and creating the
+        # webhook needs our address, so the source has to exist first.
+        created = auth_api.post(SOURCES, {"name": "x", "type": kind}, format="json")
+        assert created.status_code == 201
+        body = created.json()
+        assert body["has_secret"] is False and body["webhook_url"]
+        auth_api.patch(f"{SOURCES}{body['id']}/", {"signing_secret": "later"}, format="json")
+        assert auth_api.get(f"{SOURCES}{body['id']}/").json()["has_secret"] is True
+
+    @pytest.mark.parametrize("kind", ["github", "generic"])
+    def test_generated_kinds_always_have_a_secret(self, auth_api, kind):
+        body = auth_api.post(SOURCES, {"name": "x", "type": kind}, format="json").json()
+        assert body["has_secret"] is True
 
     def test_generated_kinds_refuse_a_chosen_secret(self, auth_api):
         resp = auth_api.post(
@@ -1154,3 +1170,39 @@ class TestFleetFigure:
     def test_no_incidents_means_no_percentage(self, auth_api):
         summary = auth_api.get("/api/v1/analytics/fleet/").json()["summary"]
         assert summary["deploy_linked_incidents"] == 0 and summary["deploy_linked_percent"] is None
+
+
+class TestAConnectionWithoutASecretTrustsNobody:
+    """Vercel and Render connections exist before their secret does."""
+
+    def test_vercel_is_refused_until_the_secret_is_set(self, api, user):
+        source = make_source(user, "vercel", secret="")
+        assert post(api, source, VERCEL, vercel_headers(VERCEL)).status_code == 401
+        # in particular a signature made with an empty key must not pass
+        empty_key = vercel_headers(VERCEL, secret="")
+        assert post(api, source, VERCEL, empty_key).status_code == 401
+        assert not Deploy.objects.exists()
+
+    def test_render_is_refused_until_the_secret_is_set(self, api, user):
+        source = make_source(user, "render", secret="")
+        assert post(api, source, RENDER, render_headers(RENDER, secret="")).status_code == 401
+
+    def test_it_works_once_the_secret_is_given(self, auth_api, api, user):
+        created = auth_api.post(SOURCES, {"name": "V", "type": "vercel"}, format="json").json()
+        source = DeploySource.objects.get(pk=created["id"])
+        anon = APIClient()
+        assert (
+            post(anon, source, VERCEL, vercel_headers(VERCEL, secret="issued")).status_code == 401
+        )
+        auth_api.patch(f"{SOURCES}{created['id']}/", {"signing_secret": "issued"}, format="json")
+        source.refresh_from_db()
+        resp = post(anon, source, VERCEL, vercel_headers(VERCEL, secret="issued"))
+        assert resp.status_code == 200 and resp.json()["status"] == "recorded"
+
+    def test_a_blank_secret_cannot_be_set_by_patching(self, auth_api):
+        created = auth_api.post(
+            SOURCES, {"name": "V", "type": "vercel", "signing_secret": "s"}, format="json"
+        ).json()
+        resp = auth_api.patch(f"{SOURCES}{created['id']}/", {"signing_secret": ""}, format="json")
+        assert resp.status_code == 400
+        assert DeploySource.objects.get().secret == "s"
