@@ -2,6 +2,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from rest_framework import serializers
 
+from . import onboarding
 from .models import User
 
 
@@ -68,3 +69,20 @@ class AuthResponseSerializer(serializers.Serializer):
 
 class RefreshResponseSerializer(serializers.Serializer):
     access_token = serializers.CharField()
+
+
+class OnboardingStepSerializer(serializers.Serializer):
+    id = serializers.ChoiceField(choices=[(i, i) for i in onboarding.STEP_IDS])
+    done = serializers.BooleanField()
+
+
+class OnboardingSerializer(serializers.Serializer):
+    steps = OnboardingStepSerializer(many=True)
+    done_count = serializers.IntegerField()
+    total = serializers.IntegerField()
+    completed_at = serializers.DateTimeField(allow_null=True)
+    dismissed = serializers.BooleanField()
+
+
+class OnboardingUpdateSerializer(serializers.Serializer):
+    dismissed = serializers.BooleanField()

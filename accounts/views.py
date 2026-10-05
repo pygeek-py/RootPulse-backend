@@ -12,11 +12,13 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from . import github, passwordless
+from . import github, onboarding, passwordless
 from .models import EmailChallenge, User
 from .serializers import (
     AuthResponseSerializer,
     EmailStartSerializer,
+    OnboardingSerializer,
+    OnboardingUpdateSerializer,
     RefreshResponseSerializer,
     UserSerializer,
     UserUpdateSerializer,
@@ -188,6 +190,25 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(UserSerializer(request.user).data)
+
+
+class OnboardingView(APIView):
+    """The setup checklist: what is done, read from the person's own data."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=["auth"], responses={200: OnboardingSerializer})
+    def get(self, request):
+        return Response(onboarding.progress(request.user))
+
+    @extend_schema(
+        tags=["auth"], request=OnboardingUpdateSerializer, responses={200: OnboardingSerializer}
+    )
+    def patch(self, request):
+        serializer = OnboardingUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        onboarding.set_dismissed(request.user, serializer.validated_data["dismissed"])
+        return Response(onboarding.progress(request.user))
 
 
 def _login_redirect(error: str) -> HttpResponseRedirect:

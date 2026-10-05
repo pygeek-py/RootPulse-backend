@@ -16,6 +16,10 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     github_id = models.CharField(max_length=64, unique=True, null=True, blank=True)
     timezone = models.CharField(max_length=64, default="UTC")
+    # The setup checklist (accounts/onboarding.py). Which steps are done is read from the data
+    # itself; only these two moments are remembered.
+    onboarding_completed_at = models.DateTimeField(null=True, blank=True)
+    onboarding_dismissed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     USERNAME_FIELD = "email"

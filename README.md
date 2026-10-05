@@ -299,3 +299,21 @@ Files you can download, built on the spot from the same data the dashboards read
 **Files.** The PDF is made with ReportLab (pure Python, no browser or system libraries, which is what makes it behave the same on a laptop and in the Render container; check it once in the deployed container, as the roadmap advises). Everything from your account is shown as text, never interpreted as markup, and characters the built-in PDF font can't draw (for example CJK) appear as `?` rather than as boxes. Times are in your time zone. Lists are capped at the most recent 500 incidents, and the PDF says when it was cut. CSV cells that start with `=`, `+`, `-` or `@` are prefixed with `'` so a spreadsheet won't run them as formulas. Responses are `Cache-Control: no-store`.
 
 Tests: 57 in `tests/test_reports.py`. The CSV is parsed back with `csv` and the PDF with `pypdf`, and both are compared with numbers worked out by hand (checks, failures, uptime, an incident across midnight, an ongoing one, excluded ones), with the fleet analytics for the same period, and with the incident export. They also cover range validation, other users' data never appearing, the status page PDF showing nothing a visitor couldn't see, markup and non-Latin names, time zones, a 520-incident report running over pages, and the rate limit.
+
+## Onboarding (Phase 14)
+
+A setup checklist on the dashboard that teaches what RootPulse is for as it sets it up. Progress is **read from the account's own data, not stored**, so it can't drift: delete your only monitor and the step reopens, connect a deploy source anywhere and it ticks itself.
+
+`GET /api/v1/auth/onboarding/` returns the steps in order, each `{id, done}`, with `done_count`, `total`, `completed_at` and `dismissed`:
+
+| Step | Done when |
+| --- | --- |
+| `monitor` | you have a monitor |
+| `alerts` | you have an alert contact that can actually reach you (enabled, and for email, confirmed; an unconfirmed address isn't "set up") |
+| `deploys` | you have a deploy source |
+| `dependencies` | you track a provider |
+| `status-page` | you have a status page |
+
+Deviation from the roadmap's four steps: **dependencies** is the fifth, because knowing whether a problem is yours or a provider's is part of what RootPulse is for. Only two moments are remembered, as `User` fields: `onboarding_completed_at` (stamped the first time every step is done, once; later removing something reopens that step but doesn't un-finish it) and `onboarding_dismissed_at`. `PATCH` the same URL with `{"dismissed": true|false}` to hide the card or bring it back. Everything is per person, and signed-out callers get a 401.
+
+Tests: 21 in `tests/test_onboarding.py`: the steps in order, each ticking from the real thing (including alert-channel reachability and other people's data not counting), progress following the data in both directions, the completion stamp (once, surviving later changes), and dismiss/restore.

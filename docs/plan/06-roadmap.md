@@ -288,6 +288,8 @@
 
 **Checkpoint:** a fresh signup completes the whole checklist and understands what makes RootPulse different, not just that it works.
 
+> **Status: built.** See the Onboarding section of the README and the voice-and-tone guide (section 8 of the frontend design-system doc, enforced by `lib/tone.test.ts`). The checklist has five steps, not four (dependencies was added).
+
 ---
 
 ### Phase 15 — API & Developer Platform
