@@ -60,11 +60,17 @@ class RunDueChecksView(APIView):
 
         notifications = run_notifications_once()
         logger.info("notification pass: %s", notifications.as_dict())
+
+        from statuspages.mail import run_status_page_mail_once
+
+        subscribers = run_status_page_mail_once()
+        logger.info("status page mail pass: %s", subscribers.as_dict())
         return Response(
             {
                 **summary.as_dict(),
                 "providers": providers.as_dict(),
                 "notifications": notifications.as_dict(),
+                "status_page_mail": subscribers.as_dict(),
             }
         )
 

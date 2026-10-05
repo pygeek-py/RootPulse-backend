@@ -248,6 +248,8 @@
 
 **Checkpoint:** RootPulse's own public status page, for RootPulse itself, is live and linked from the landing page footer.
 
+> **Status: built.** See the Status pages section of the README. The checkpoint needs the deployed app: create the page, add RootPulse's own monitors, publish it, and set `NEXT_PUBLIC_STATUS_PAGE_URL` on the frontend so the footer's Status link points at it. Custom domains (the stretch goal) are not built. The public surface is on the Phase 16 review list.
+
 ---
 
 ### Phase 13 — Reports & Export

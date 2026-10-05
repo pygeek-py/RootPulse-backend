@@ -28,6 +28,7 @@ EMAIL_CHALLENGE_RESEND_SECONDS = 0
 
 # Engine: run checks inline, never pause, and never talk to real probers.
 CHECK_WORKERS = 1
+STATUS_PAGE_MAIL_WORKERS = 1
 CHECK_RECHECK_DELAY_SECONDS = 0
 PROBER_URLS = ""
 PROBER_SHARED_SECRET = ""

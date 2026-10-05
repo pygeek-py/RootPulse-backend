@@ -11,6 +11,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
@@ -66,6 +67,7 @@ INSTALLED_APPS = [
     "analytics",
     "deploys",
     "providers",
+    "statuspages",
 ]
 
 MIDDLEWARE = [
@@ -197,6 +199,11 @@ REST_FRAMEWORK = {
         "integration_callback": "30/min",
         "heartbeat": "120/min",  # per source IP; a job normally pings once per run
         "auth_github": "20/min",
+        # The public status page and its forms (docs/plan/04-security.md #6), per source IP.
+        "public_status": "120/min",  # a page open in a few tabs refreshes about once a minute
+        "public_unlock": "10/min",  # password guesses
+        "public_subscribe": "10/hour",  # each one can send an email to a stranger
+        "public_token": "30/min",  # confirm / unsubscribe links
     },
     "EXCEPTION_HANDLER": "config.exceptions.api_exception_handler",
     # How many reverse proxies sit in front of the app (Render = 1). Without
@@ -217,6 +224,9 @@ SPECTACULAR_SETTINGS = {
         "DeploySourceTypeEnum": "deploys.models.DeploySource.Type",
         "DeliveryStatusEnum": "notifications.models.NotificationDelivery.Status",
         "DeliveryEventEnum": "notifications.models.NotificationDelivery.Event",
+        "AnnouncementKindEnum": "statuspages.models.StatusPageAnnouncement.Kind",
+        "AnnouncementImpactEnum": "statuspages.models.StatusPageAnnouncement.Impact",
+        "AnnouncementStateEnum": "statuspages.serializers.ANNOUNCEMENT_STATES",
     },
 }
 
@@ -235,6 +245,8 @@ CORS_ALLOW_CREDENTIALS = True
 # Browsers hide most response headers from cross-origin scripts. The frontend needs this one
 # to name a downloaded CSV.
 CORS_EXPOSE_HEADERS = ["Content-Disposition"]
+# The password-protected status page sends the token it was given when unlocked.
+CORS_ALLOW_HEADERS = (*default_headers, "x-status-page-token")
 
 
 # Auth (docs/plan/04-security.md #1, #7)
@@ -311,6 +323,8 @@ NOTIFY_BACKOFF_SECONDS = (60, 300, 900, 900)  # after attempt 1, 2, 3, 4 (docs/p
 NOTIFY_WORKERS = int(os.environ.get("NOTIFY_WORKERS", "8"))
 NOTIFY_BATCH_SIZE = int(os.environ.get("NOTIFY_BATCH_SIZE", "100"))
 NOTIFY_HTTP_TIMEOUT = 10
+STATUS_PAGE_MAIL_WORKERS = int(os.environ.get("STATUS_PAGE_MAIL_WORKERS", "4"))
+STATUS_PAGE_MAIL_BATCH_SIZE = 50
 NOTIFY_MAX_REMINDERS = 24  # a long outage reminds at most this many times
 MAX_ALERT_CONTACTS_PER_USER = int(os.environ.get("MAX_ALERT_CONTACTS_PER_USER", "20"))
 # Web push (VAPID). Generate once with: python manage.py generate_vapid_keys

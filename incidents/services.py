@@ -22,6 +22,18 @@ from .models import Incident, IncidentEvent
 logger = logging.getLogger(__name__)
 
 
+def _tell_status_page_subscribers(hook: str, incident: Incident) -> None:
+    """Email the people subscribed to public status pages that show this monitor. Best effort:
+    a problem here must never cost the incident, or the alerts to the owner."""
+    try:
+        with transaction.atomic():
+            from statuspages import services as status_pages
+
+            getattr(status_pages, hook)(incident)
+    except Exception:  # noqa: BLE001
+        logger.exception("couldn't queue status page emails for incident %s", incident.id)
+
+
 def open_incident(
     monitor: Monitor, check: Check, confirmations: Iterable[Check] = ()
 ) -> Incident | None:
@@ -69,6 +81,7 @@ def open_incident(
     from notifications import services as notify
 
     notify.schedule_opened(incident)
+    _tell_status_page_subscribers("on_incident_opened", incident)
     if confirmations:
         regions = sorted({c.region for c in confirmations} | {check.region})
         failed = sorted({check.region} | {c.region for c in confirmations if c.success is False})
@@ -130,6 +143,7 @@ def reconcile(
             from notifications import services as notify
 
             notify.schedule_resolved(closed)
+            _tell_status_page_subscribers("on_incident_closed", closed)
 
 
 def close_for_pause(monitor: Monitor) -> None:

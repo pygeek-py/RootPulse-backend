@@ -244,3 +244,41 @@ Two deliberate differences from the roadmap's sketch: providers are addressed by
 `python manage.py run_provider_polls_once` reads everything due once; `seed_providers` re-syncs the catalogue. Tunables (all optional): `PROVIDER_POLL_SECONDS`, `PROVIDER_IDLE_POLL_SECONDS`.
 
 Tests: adapters against the real fixtures, ingestion, the alert rules, replay, the poller (with a mocked transport; the suite blocks real network), and the API.
+
+## Status pages (Phase 12)
+
+A public, branded page that shows the state of the monitors you choose. It is the one place RootPulse shows your data to people who aren't signed in, so what it may reveal is narrow and written down in one function (`statuspages/services.py: build_public`), which builds the payload field by field instead of serialising models.
+
+**What the public sees:** the page name and branding; each component's name (the one *you* chose), group, current status and 90-day uptime bar; ongoing and recent (14 days) outages as "component, started, ended"; announcements you posted; and any incident note you switched to **visible on status page**. **What it never sees:** a monitor's name, id, target, type, config or deploy tag, why a check failed, status codes, who wrote a note, or anything about your account. A test asserts none of those strings appear in the response.
+
+**Models** (`statuspages/models.py`): `StatusPage` (name, unique slug, password hash, `is_public`, branding), `StatusPageComponent` (a monitor shown under a display name, group and order, unique per page), `StatusPageAnnouncement` (an incident write-up or planned maintenance), `StatusPageSubscriber` (email, confirmation and unsubscribe tokens) and `StatusPageEmail` (the outgoing mail queue). One page per user (a product limit, enforced in the API rather than the schema).
+
+**Owner API** (`/api/v1/status-pages/`, signed in, everything scoped to you; another user's page and its parts are a 404 on every route):
+
+- `GET/POST /status-pages/`, `GET/PATCH/DELETE /status-pages/{id}/` (name, slug, `is_public`, `branding`, write-only `password`: a string sets it, `null` removes it; password changes are audit-logged without the password)
+- `GET /status-pages/{id}/preview/`: the page as visitors will see it, even when it is a draft or has a password
+- `GET/POST .../components/`, `PATCH/DELETE .../components/{cid}/`, `POST .../components/reorder/`
+- `GET/POST .../announcements/`, `PATCH/DELETE .../announcements/{aid}/`, `POST .../announcements/{aid}/resolve/`
+- `GET .../subscribers/` (paged), `DELETE .../subscribers/{sid}/`
+
+Branding takes only `accent` (`#rrggbb`), `logo_url` and `support_url` (https only), and a plain-text `description`; unknown keys are not stored, and the frontend renders everything as text.
+
+**Public API** (`/api/v1/public/status-pages/{slug}/`, no sign-in, each with its own per-IP throttle):
+
+| Request | What it does |
+| --- | --- |
+| `GET /` | The page. A missing page and an unpublished one are the same 404. A password-protected page returns only `{name, slug, branding, password_required: true}` until unlocked. Never cached (`Cache-Control: no-store`), so a note switched off or a page unpublished disappears at once. |
+| `POST /unlock/` `{password}` | 403 for a wrong password (10/min per IP), otherwise a signed token valid 12 hours, sent back as `X-Status-Page-Token`. The token is tied to the page and to the current password, so changing the password signs everyone out. |
+| `POST /subscribe/` `{email}` | Starts double opt-in. Always answers 202 with the same words, whether or not the address is known. 10/hour per IP, one confirmation email per address per 10 minutes, caps on subscribers (1000) and unconfirmed requests (200). |
+| `POST /confirm/{token}/` | Confirms once. Unconfirmed requests expire after 7 days. |
+| `GET /unsubscribe/{token}/`, `POST /unsubscribe/{token}/` | GET tells the page who the link is for and changes nothing (mail scanners open links); POST removes the subscriber. Works even if the page is later unpublished. |
+
+Deviation from the plan sketch: unsubscribing is a POST (with a GET that only describes), not a state-changing GET, and every email carries `List-Unsubscribe` and `List-Unsubscribe-Post` headers for one-click unsubscribe.
+
+**Subscriber email** uses the same queue shape as alerts (`statuspages/mail.py`): rows are written when something happens, claimed with `FOR UPDATE SKIP LOCKED`, retried with the alert back-off, and sent in the engine pass (`run_engine`, `POST /internal/run-due-checks/`, or `manage.py run_status_page_mail_once`). Plain text only. Confirmed subscribers of a **published** page are emailed when a component's monitor goes down and when it recovers (recovery only to those who were told it went down; if the first email hasn't gone out yet it is cancelled instead), and when you post or resolve an announcement (you can untick "Email subscribers"). Nothing is sent about a monitor in a maintenance window, for a page that was unpublished before the mail went out, or to anyone who hasn't confirmed. A problem queueing these emails never costs the incident or the alerts to the owner.
+
+**Uptime bars** come from the daily rollups (`CheckRollupDaily`): failures inside an excluded incident don't count, and a day with no data is blank, never 100%. Incidents excluded from reports are left off the public page as well. Component status maps the monitor's state (`up` operational, `down` outage, `paused` not monitored, `pending` checking) and shows *maintenance* while the monitor is inside a maintenance window; the banner is *all operational*, *partial outage* (some down), *major outage* (all down) or *under maintenance*.
+
+**Not built (stretch goal in the plan):** custom domains. The page lives at `/s/{slug}` on the frontend.
+
+Tests: 129 in `tests/test_status_pages.py`, covering ownership on every route, slug/branding/password validation, the access rules (unpublished vs missing, locked pages leak nothing, tokens are per page and die with the password, expiry, throttles), what the public payload contains and omits, a fixed number of queries however large the page, the comment-visibility toggle appearing and disappearing on the page through the real incident API, the double opt-in flow, and the email queue (fan-out, recovery rules, retries, permanent failures, header injection).

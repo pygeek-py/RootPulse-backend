@@ -16,6 +16,7 @@ from monitoring.engine import run_scheduler_once
 from notifications.dispatcher import run_notifications_once
 from notifications.integrations import poll_once
 from providers.poller import run_provider_polls_once
+from statuspages.mail import run_status_page_mail_once
 
 
 class Command(BaseCommand):
@@ -33,6 +34,7 @@ class Command(BaseCommand):
                 checks = run_scheduler_once().as_dict()
                 run_provider_polls_once()  # third-party status pages, before alerts go out
                 alerts = run_notifications_once().as_dict()
+                run_status_page_mail_once()  # status page subscribers
                 poll_once()  # development: pick up "Connect Telegram" presses (no-op in production)
                 # Production runs rollups from their own hourly cron; locally, every ten minutes.
                 if last_rollup is None or timezone.now() - last_rollup > timedelta(minutes=10):
