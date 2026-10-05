@@ -63,6 +63,10 @@ class FleetSummarySerializer(IncidentFiguresSerializer):
     uptime_percent = serializers.FloatField(allow_null=True)
     checks = serializers.IntegerField()
     avg_response_ms = serializers.IntegerField(allow_null=True)
+    deploy_linked_incidents = serializers.IntegerField(
+        help_text="Incidents that began shortly after a deploy of the monitor's service."
+    )
+    deploy_linked_percent = serializers.FloatField(allow_null=True)
 
 
 class OffenderMonitorSerializer(serializers.Serializer):

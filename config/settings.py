@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "incidents",
     "notifications",
     "analytics",
+    "deploys",
 ]
 
 MIDDLEWARE = [
@@ -189,6 +190,7 @@ REST_FRAMEWORK = {
         "notify_test": "10/min",  # each one sends a real alert
         "contact_verify": "10/hour",
         "analytics": "60/min",
+        "deploy_webhook": "120/min",  # per source IP; a deploy is rare, a retry storm is not
         "integration_connect": "30/hour",  # starting a Telegram/Discord/Slack connection
         "integration_poll": "120/min",  # the page asking "did the Telegram link finish yet?"
         "integration_callback": "30/min",
@@ -209,6 +211,8 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "StatusEnum": "monitoring.models.Monitor.Status",
+        "TypeEnum": "monitoring.models.Monitor.Type",
+        "DeploySourceTypeEnum": "deploys.models.DeploySource.Type",
         "DeliveryStatusEnum": "notifications.models.NotificationDelivery.Status",
         "DeliveryEventEnum": "notifications.models.NotificationDelivery.Event",
     },
@@ -333,6 +337,12 @@ INTEGRATION_LINK_TTL_SECONDS = 15 * 60
 # checks that were written a little late.
 CHECK_RETENTION_DAYS = int(os.environ.get("CHECK_RETENTION_DAYS", "90"))
 ROLLUP_LOOKBACK_HOURS = 2
+
+# Deploys (deploys/). An incident is linked to the latest deploy of its monitor's tagged service
+# that finished within this long before it started.
+DEPLOY_CORRELATION_WINDOW_SECONDS = int(os.environ.get("DEPLOY_CORRELATION_WINDOW_SECONDS", "300"))
+DEPLOY_MAX_BODY_BYTES = 256 * 1024
+MAX_DEPLOY_SOURCES_PER_USER = int(os.environ.get("MAX_DEPLOY_SOURCES_PER_USER", "10"))
 
 # Passwordless sign-in (accounts/passwordless.py).
 EMAIL_CHALLENGE_TTL_SECONDS = 15 * 60

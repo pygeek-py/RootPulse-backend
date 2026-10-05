@@ -217,6 +217,9 @@ def fleet_analytics(user, range_key: str, *, now: datetime | None = None) -> dic
     monitors = {m.id: m for m in Monitor.objects.filter(user=user)}
     incidents = _incidents(list(monitors), start, now, now)
     figures = incident_figures(incidents, start, now, now)
+    # How many of this period's incidents followed a deploy (PRD section 6.5).
+    began = [i for i in incidents if not i.excluded_from_reports and start <= i.started_at]
+    linked = sum(1 for i in began if i.deploy_id)
 
     # Per-monitor downtime from incidents (this is what answers "who hurt me most").
     by_monitor: dict = defaultdict(lambda: {"downtime": 0.0, "incidents": 0})
@@ -270,6 +273,8 @@ def fleet_analytics(user, range_key: str, *, now: datetime | None = None) -> dic
             "checks": up + down,
             "avg_response_ms": _avg(sum(r.response_sum_ms for r in rows.values()), response_count),
             **figures,
+            "deploy_linked_incidents": linked,
+            "deploy_linked_percent": round(100 * linked / len(began), 1) if began else None,
         },
         "daily": daily,
         "top_offenders": top,

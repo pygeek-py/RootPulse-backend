@@ -63,6 +63,10 @@ def _event_line(event: IncidentEvent, incident: Incident) -> str | None:
     if event.kind == IncidentEvent.Kind.CONFIRMED:
         failing = ", ".join(meta.get("regions_failing", []))
         return f"Confirmed from more than one place (failing: {failing})."
+    if event.kind == IncidentEvent.Kind.DEPLOY_LINKED:
+        version = f" ({meta['version']})" if meta.get("version") else ""
+        lag = humanize(int(meta.get("seconds_before", 0)))
+        return f"Started {lag} after a deploy of {meta.get('service', 'the service')}{version}."
     if event.kind == IncidentEvent.Kind.RESOLVED:
         return "Recovered: a check succeeded."
     if event.kind == IncidentEvent.Kind.CLOSED_PAUSED:
@@ -70,6 +74,28 @@ def _event_line(event: IncidentEvent, incident: Incident) -> str | None:
     if event.kind == IncidentEvent.Kind.CLOSED_EDITED:
         return "Closed because the monitor's settings were changed."
     return None  # report-exclusion toggles aren't part of the story
+
+
+STAGE_WORDS = {
+    "dns": "the DNS lookup",
+    "tcp": "the connection",
+    "tls": "the TLS handshake",
+    "server": "the server's response",
+}
+
+
+def _root_cause_hint(incident: Incident) -> str:
+    """What RootPulse already knows, so the writer starts from facts (empty if nothing)."""
+    lines = []
+    deploy = incident.deploy if incident.deploy_id else None
+    if deploy is not None:
+        lag = humanize(max(0, round((incident.started_at - deploy.occurred_at).total_seconds())))
+        version = f" ({deploy.version})" if deploy.version else ""
+        lines.append(f"- It began {lag} after a deploy of {deploy.service_name}{version}.")
+    stage = STAGE_WORDS.get(incident.root_cause_stage)
+    if stage:
+        lines.append(f"- The request went wrong at {stage}.")
+    return "\n".join(lines) + "\n\n" if lines else ""
 
 
 def build(incident: Incident, timezone_name: str = "UTC") -> dict[str, str]:
@@ -92,6 +118,7 @@ def build(incident: Incident, timezone_name: str = "UTC") -> dict[str, str]:
     entries.sort(key=lambda item: item[0])
 
     timeline = "\n".join(f"- **{fmt(when)}** {text}" for when, text in entries)
+    root_cause_hint = _root_cause_hint(incident)
     zone_label = timezone_name if zone.key == timezone_name else "UTC"
     day = fmt(incident.started_at, with_date=True).split(" ")[0]
 
@@ -116,7 +143,7 @@ _Describe what users experienced, in plain words._
 
 ## Root cause
 
-_What actually went wrong, and why?_
+{root_cause_hint}_What actually went wrong, and why?_
 
 ## Resolution
 

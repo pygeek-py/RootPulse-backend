@@ -185,5 +185,28 @@ Each row holds up/down/inconclusive counts, response-time statistics (count, sum
 API: `GET /api/v1/monitors/{id}/analytics/?range=24h|7d|30d|90d` (hourly buckets up to a week, daily beyond; summary, response-time series, timing breakdown; the last two hours are refreshed on request so it is current without waiting for the job, which is the only raw-check read and is bounded to that window) and `GET /api/v1/analytics/fleet/?range=7d|30d|90d` (summary, a daily series, and the top offenders by downtime; read entirely from rollups, a fixed number of queries however long the range). The fleet figures can be up to an hour old (`data_as_of`).
 
 Tests: 792 in total, including rollup correctness against known synthetic checks (exact percentiles, hour boundaries, confirmation re-checks, exclusions, midnight-spanning incidents, retention), idempotency, and endpoint tests proving a month of history is served with no raw checks present and that no query touches raw checks outside the last 48 hours.
+
+## Deploys and root cause (Phase 10)
+
+An incident now says **what it followed** and **where the request went wrong**.
+
+**Connecting a source.** `POST /api/v1/deploy-sources/` creates a connection (`github`, `vercel`, `render` or `generic`). Each has its own webhook address, `POST /api/v1/deploys/webhook/{source}/{token}/`, and its own signing secret. The token in the URL says whose connection it is; the provider's signature over the body says the request is genuine, and **both must hold**: an unknown, switched-off or mismatched address is a plain 404 (it never says which part was wrong), a bad signature is a 401, and a body over 256 KB is a 413. Nothing in the body is read before the signature is checked. Each provider's own scheme is verified:
+
+| Source | Signature | Counts as a deploy |
+| --- | --- | --- |
+| `generic` | `X-RootPulse-Signature: t=..,v1=hmac_sha256(secret, "<t>." + body)` (the same scheme as the scheduler trigger; stale timestamps refused) | `{"service": "my-api", "version"?, "environment"?, "url"?, "occurred_at"?, "id"?}` |
+| `github` | `X-Hub-Signature-256: sha256=...` | `deployment_status` with state `success`; a `workflow_run` that completed successfully **and is named like a deploy** (deploy, release, ship, publish). Pings are acknowledged and ignored. |
+| `vercel` | `x-vercel-signature` (HMAC-SHA1 of the body) | `deployment.succeeded` / `deployment.ready` |
+| `render` | Svix-style `webhook-id` / `webhook-timestamp` / `webhook-signature` (several signatures allowed for key rotation; stale timestamps refused) | `deploy_ended` with a succeeded status |
+
+A genuine request that isn't a successful deploy (a ping, a failed run, a preview) is answered `202 {"status": "ignored"}`. A connection can be limited to one environment (`production`); other environments are ignored. Ingestion is idempotent per provider id (a retry or replay is a no-op), the provider's clock is believed only when plausible, links must be plain http(s), text is stripped of control characters, and only a small summary of the payload is stored. Secrets: RootPulse generates the secret for GitHub and generic connections (shown once, rotatable); for Vercel and Render the provider issues it and you paste it in. Secrets never appear in a response after creation.
+
+**Which monitor does a deploy belong to?** The convention is explicit: a monitor has a **`deploy_service`** tag, and a deploy links to it only when that tag equals the deploy's service name (case-insensitive). For GitHub the service name is the repository name, and `owner/name` also matches; for Vercel it is the project name; for Render the service name (or id); for generic whatever you send as `service`. **A monitor with no tag is never linked**, so one deploy can't blame every monitor.
+
+**Linking.** When an incident opens, it is linked to the latest deploy of its monitor's tagged service that finished within `DEPLOY_CORRELATION_WINDOW_SECONDS` (300) *before* it started; a deploy after the incident is not blamed (it is probably the fix). If the deploy webhook arrives *after* the incident was opened, the deploy links it retroactively when it happened just before the incident; a closer deploy replaces a farther one, never the reverse. The link is written to the timeline (`deploy_linked`), shown in the incident and its alerts ("Started 90 s after a deploy of my-api (abc1234)."), added to the postmortem draft, and counted on the fleet overview ("% of incidents after a deploy"). Deleting a deploy or a source leaves incidents intact.
+
+**Root-cause stage** (`deploys/rootcause.py`, HTTP and keyword monitors). The failing check's timings are compared with that monitor's own 30-day average per stage, from the rollups. Either the failure names the stage (a DNS error is DNS, a refused connection is TCP, a TLS error is TLS), or the stage that regressed most wins, provided it is both at least twice as slow and at least 100 ms slower than usual (so 2 ms to 5 ms isn't an incident). A server that answers with an error is "the server's response". A timeout leaves no timings, so the stage is left blank rather than guessed. The per-stage figures are stored with the incident so the UI can show them against the usual.
+
+Tests: 919 in total, including a signature matrix per provider (bad, missing, wrong secret, stale, tampered), replays, environment filtering, every correlation case (window edges, late deploys, closer-wins, other users and services, untagged monitors) and the stage rules.
  Per-channel tests use stubbed HTTP, so no test touches the network.
 

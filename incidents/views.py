@@ -112,7 +112,7 @@ class IncidentViewSet(
     def get_queryset(self):
         qs = (
             self._scoped()
-            .select_related("monitor", "opened_by")
+            .select_related("monitor", "opened_by", "deploy")
             .annotate(comment_count=Count("comments", distinct=True))
         )
         params = self.request.query_params
@@ -150,7 +150,9 @@ class IncidentViewSet(
     def get_object(self):
         # Detail routes ignore the list's filters; ownership is the only constraint.
         incident = get_object_or_404(
-            self._scoped().select_related("monitor", "opened_by").prefetch_related("events"),
+            self._scoped()
+            .select_related("monitor", "opened_by", "deploy")
+            .prefetch_related("events"),
             pk=self.kwargs["pk"],
         )
         self.check_object_permissions(self.request, incident)

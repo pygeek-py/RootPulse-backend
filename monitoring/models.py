@@ -79,6 +79,9 @@ class Monitor(models.Model):
     # URL, host or domain depending on the type; blank for heartbeat monitors.
     target = models.CharField(max_length=2048, blank=True)
     config = models.JSONField(default=dict, blank=True)
+    # Which deploys are about this monitor: an incident links to a deploy whose service name
+    # (or repo / project id) equals this, case-insensitively. Blank means "never link".
+    deploy_service = models.CharField(max_length=100, blank=True)
     interval_seconds = models.PositiveIntegerField()
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
     # What the scheduler claims against (Phase 6). NULL means "never due" (paused).

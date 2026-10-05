@@ -42,6 +42,12 @@ class MonitorSerializer(serializers.ModelSerializer):
         help_text="Contacts alerted about this monitor. Omit on create to use all of yours.",
     )
     target = serializers.CharField(max_length=2048, required=False, allow_blank=True)
+    deploy_service = serializers.CharField(
+        max_length=100,
+        required=False,
+        allow_blank=True,
+        help_text="Link incidents to deploys of this service (a repo, project or service name).",
+    )
     heartbeat_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -52,6 +58,7 @@ class MonitorSerializer(serializers.ModelSerializer):
             "name",
             "target",
             "config",
+            "deploy_service",
             "interval_seconds",
             "status",
             "next_check_at",

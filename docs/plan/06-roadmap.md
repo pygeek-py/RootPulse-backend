@@ -208,6 +208,8 @@
 
 **Checkpoint:** RootPulse itself is set up to monitor its own deploys as the first real dogfood test of this feature.
 
+> **Status: built.** See the Deploys section of the README. The dogfood step needs the deployed app (connect the repo's webhook to the production API and tag the production monitor).
+
 ---
 
 ### Phase 11 — Dependency Monitoring

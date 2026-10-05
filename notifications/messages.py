@@ -48,6 +48,31 @@ def humanize_duration(seconds: int) -> str:
     return f"{days} d {hours} h" if hours else f"{days} d"
 
 
+STAGE_NAMES = {
+    "dns": "the DNS lookup",
+    "tcp": "the connection",
+    "tls": "the TLS handshake",
+    "server": "the server's response",
+}
+
+
+def context_lines(incident: Incident | None) -> list[str]:
+    """What the incident followed (a deploy) and where it went wrong, when we know."""
+    if incident is None:
+        return []
+    lines = []
+    deploy = incident.deploy if incident.deploy_id else None
+    if deploy is not None:
+        lag = max(0, round((incident.started_at - deploy.occurred_at).total_seconds()))
+        version = f" ({deploy.version})" if deploy.version else ""
+        lines.append(
+            f"Started {humanize_duration(lag)} after a deploy of {deploy.service_name}{version}."
+        )
+    if incident.root_cause_stage in STAGE_NAMES:
+        lines.append(f"Most likely stage: {STAGE_NAMES[incident.root_cause_stage]}.")
+    return lines
+
+
 def link_for(incident: Incident | None, monitor: Monitor) -> str:
     base = settings.FRONTEND_URL.rstrip("/")
     return f"{base}/incidents/{incident.id}" if incident else f"{base}/monitors/{monitor.id}"
@@ -70,6 +95,7 @@ def build(
     if event == "opened":
         title, severity = f"{name} is DOWN", "down"
         summary = f"{cause}." if cause else "The monitor is down."
+        summary = " ".join([summary, *context_lines(incident)])
     elif event == "reminder":
         title, severity = f"{name} is still DOWN", "down"
         summary = f"Down for {humanize_duration(duration)} ({cause})."
@@ -102,6 +128,17 @@ def build(
                 "reason": reason,
                 "reason_label": cause,
                 "status_code": status_code,
+                "root_cause_stage": incident.root_cause_stage,
+                "deploy": (
+                    {
+                        "service": incident.deploy.service_name,
+                        "version": incident.deploy.version,
+                        "url": incident.deploy.url,
+                        "occurred_at": incident.deploy.occurred_at.isoformat(),
+                    }
+                    if incident.deploy_id
+                    else None
+                ),
             }
             if incident
             else None

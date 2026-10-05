@@ -52,6 +52,18 @@ def open_incident(
             "check_id": check.id,
         },
     )
+    # Say what it likely followed (a deploy) and where it went wrong (a request stage), before
+    # anyone is told, so the alert can include both. Best effort: never at the cost of the incident.
+    try:
+        with transaction.atomic():
+            from deploys import rootcause
+            from deploys import services as deploy_services
+
+            deploy_services.correlate_incident(incident)
+            rootcause.compute_for_incident(incident, check)
+    except Exception:  # noqa: BLE001
+        logger.exception("couldn't explain incident %s", incident.id)
+
     # Tell the monitor's contacts (after each one's configured delay). Same transaction as
     # the incident, so there is never an incident nobody was queued to hear about.
     from notifications import services as notify

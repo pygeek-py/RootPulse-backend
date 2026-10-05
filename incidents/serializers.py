@@ -3,6 +3,7 @@ from __future__ import annotations
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from deploys.serializers import DeployBriefSerializer
 from monitoring.models import Monitor
 from monitoring.serializers import CheckSerializer
 from notifications.serializers import DeliverySerializer
@@ -18,10 +19,27 @@ class MonitorBriefSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class StageFigureSerializer(serializers.Serializer):
+    stage = serializers.ChoiceField(choices=["dns", "tcp", "tls", "server"])
+    ms = serializers.IntegerField(allow_null=True)
+    baseline_ms = serializers.IntegerField(allow_null=True)
+    regressed = serializers.BooleanField()
+
+
+class RootCauseSerializer(serializers.Serializer):
+    """Where the failing request went wrong. `basis` says how we know: the failure named the
+    stage, one stage ran much slower than usual, or the server answered with an error."""
+
+    stage = serializers.CharField(allow_blank=True)
+    basis = serializers.ChoiceField(choices=["failure", "timing", "response", "unknown"])
+    stages = StageFigureSerializer(many=True)
+
+
 class IncidentSerializer(serializers.ModelSerializer):
     """One row of the incident list."""
 
     monitor = MonitorBriefSerializer(read_only=True)
+    deploy = serializers.SerializerMethodField()
     ongoing = serializers.BooleanField(read_only=True)
     duration_seconds = serializers.SerializerMethodField()
     comment_count = serializers.IntegerField(read_only=True, default=0)
@@ -40,9 +58,16 @@ class IncidentSerializer(serializers.ModelSerializer):
             "resolution",
             "excluded_from_reports",
             "root_cause_stage",
+            "deploy",
             "comment_count",
         ]
         read_only_fields = fields
+
+    @extend_schema_field(DeployBriefSerializer(allow_null=True))
+    def get_deploy(self, obj: Incident):
+        if not obj.deploy_id:
+            return None
+        return DeployBriefSerializer(obj.deploy, context={"incident": obj}).data
 
     @extend_schema_field(serializers.IntegerField())
     def get_duration_seconds(self, obj: Incident) -> int:
@@ -103,6 +128,7 @@ class IncidentDetailSerializer(IncidentSerializer):
     comments = serializers.SerializerMethodField()
     opening_check = CheckSerializer(source="opened_by", read_only=True, allow_null=True)
     notifications = serializers.SerializerMethodField()
+    root_cause = serializers.SerializerMethodField()
 
     class Meta(IncidentSerializer.Meta):
         fields = [
@@ -111,8 +137,13 @@ class IncidentDetailSerializer(IncidentSerializer):
             "comments",
             "opening_check",
             "notifications",
+            "root_cause",
         ]
         read_only_fields = fields
+
+    @extend_schema_field(RootCauseSerializer(allow_null=True))
+    def get_root_cause(self, obj: Incident):
+        return obj.root_cause or None
 
     @extend_schema_field(DeliverySerializer(many=True))
     def get_notifications(self, obj: Incident):

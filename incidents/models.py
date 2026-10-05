@@ -33,8 +33,14 @@ class Incident(models.Model):
     # Why it closed: "recovered" (a check succeeded), or the monitor was paused / edited.
     resolution = models.CharField(max_length=16, blank=True)
     excluded_from_reports = models.BooleanField(default=False)
-    # Which phase of the request regressed most (dns/tcp/tls/server). Computed in Phase 10.
+    # Which phase of the request went wrong (dns/tcp/tls/server), blank when unknown, and the
+    # figures behind it (see deploys/rootcause.py).
     root_cause_stage = models.CharField(max_length=8, blank=True)
+    root_cause = models.JSONField(default=dict, blank=True)
+    # The deploy this most plausibly followed (see deploys/services.py), if any.
+    deploy = models.ForeignKey(
+        "deploys.Deploy", null=True, blank=True, on_delete=models.SET_NULL, related_name="incidents"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -75,7 +81,7 @@ class IncidentEvent(models.Model):
         INCLUDED = "included", "Included in reports"
         NOTIFICATION_SENT = "notification_sent", "Alert sent"
         NOTIFICATION_FAILED = "notification_failed", "Alert failed"
-        # Added by a later phase: deploy_linked.
+        DEPLOY_LINKED = "deploy_linked", "Linked to a deploy"
 
     id = models.BigAutoField(primary_key=True)
     incident = models.ForeignKey(Incident, on_delete=models.CASCADE, related_name="events")
