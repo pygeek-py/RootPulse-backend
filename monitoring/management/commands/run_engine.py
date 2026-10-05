@@ -15,6 +15,7 @@ from analytics.rollups import run_rollups_once
 from monitoring.engine import run_scheduler_once
 from notifications.dispatcher import run_notifications_once
 from notifications.integrations import poll_once
+from providers.poller import run_provider_polls_once
 
 
 class Command(BaseCommand):
@@ -30,6 +31,7 @@ class Command(BaseCommand):
         while True:
             try:
                 checks = run_scheduler_once().as_dict()
+                run_provider_polls_once()  # third-party status pages, before alerts go out
                 alerts = run_notifications_once().as_dict()
                 poll_once()  # development: pick up "Connect Telegram" presses (no-op in production)
                 # Production runs rollups from their own hourly cron; locally, every ten minutes.

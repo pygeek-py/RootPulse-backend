@@ -1,0 +1,209 @@
+[
+ {
+  "id": 1579,
+  "title": "Free Plan Customers Are Experiencing Message Failures",
+  "type": "incident",
+  "status": "resolved",
+  "url": "https://slack-status.com/2026-10/6c28dfb7b670dc02",
+  "date_created": "2026-10-01T05:39:35-07:00",
+  "date_updated": "2026-10-01T11:59:35-07:00",
+  "notes": [
+   {
+    "body": "<p>We're aware that some customers on our free plan are experiencing message-sending limit blocks in an unusual spike pattern, which is preventing them from sending messages. We're investigating why this message limit was triggered unexpectedly for some teams. If you're affected, you may be temporarily unable to send messages until this is resolved.&nbsp;<br><br>We'll provide an update in 30 minutes or sooner if additional information becomes available.</p>",
+    "date_created": "2026-10-01T05:39:35-07:00"
+   },
+   {
+    "body": "<p>We identified that a third-party app is stuck in a loop that has triggered billions of messages. This is causing free plan users to exceed messaging limits.&nbsp;<br><br>We apologize for the inconvenience and will provide another update as soon as we have more details to share.&nbsp;</p>",
+    "date_created": "2026-10-01T05:56:59-07:00"
+   },
+   {
+    "body": "<p>A feature toggle ramp-up caused an app integration to repeatedly post messages in a processing loop. This pushed free plan customers over the message volume threshold, triggering the sending block. We're working to restore access and are actively working on remediation options for impacted Workspaces.&nbsp;<br><br>We apologize for the inconvenience and will provide another update as soon as we have more details to share.&nbsp;</p>",
+    "date_created": "2026-10-01T06:58:40-07:00"
+   },
+   {
+    "body": "<p>We’ve identified a potential fix for this issue and we’re working on getting this out to users as quickly as possible. We’ll be back once we have another update to share.<br><br>Thank you for your continued patience as we work towards a solution.</p>",
+    "date_created": "2026-10-01T07:31:24-07:00"
+   },
+   {
+    "body": "<p>Deployment of the fix is underway to restore access for impacted free plan workspaces, and we are actively monitoring the environment. More information will follow as we progress through this stage of remediation.&nbsp;</p>",
+    "date_created": "2026-10-01T11:52:01-07:00"
+   },
+   {
+    "body": "<p>A messaging integration briefly caused some free-plan workspaces to exceed their daily messaging limit, blocking them from sending messages. We took action to lift the sending block for all affected free-plan workspaces, and have confirmed messaging is now restored. We apologize for how this incident affected you and your business. We will undertake a full investigation of the incident, establishing the technical trigger, the underlying cause, and preventive action to avoid a repeat in the future.</p>",
+    "date_created": "2026-10-01T11:59:35-07:00"
+   }
+  ],
+  "services": [
+   "Messaging"
+  ]
+ },
+ {
+  "id": 1576,
+  "title": "Trouble Accessing Historical Messages With Custom Data Retention Policies Enabled",
+  "type": "incident",
+  "status": "resolved",
+  "url": "https://slack-status.com/2026-08/e07b9271f0346c3b",
+  "date_created": "2026-08-13T14:21:41-07:00",
+  "date_updated": "2026-09-14T15:31:02-07:00",
+  "notes": [
+   {
+    "body": "<p>Users with custom data retention policies enabled might be unable to see or load older messages. We apologize for the trouble and we'll share more news as it becomes available.</p>",
+    "date_created": "2026-08-13T14:21:41-07:00"
+   },
+   {
+    "body": "<p>We're continuing to investigate an issue affecting a subset of channels with custom message retention settings. Our teams are working to identify the technical trigger and an appropriate fix. We'll provide an update as more news becomes available.</p>",
+    "date_created": "2026-08-13T14:49:40-07:00"
+   },
+   {
+    "body": "<p>We're continuing to investigate an issue affecting a subset of channels with custom message retention settings. Our Teams have restored functionality to the affected retention settings for known impacted customers. We are now working to identify and address any additional concerns regarding the message retention issues.</p>",
+    "date_created": "2026-08-14T12:35:56-07:00"
+   },
+   {
+    "body": "<p>After further investigation, the custom retention settings have not fully been restored yet. Our teams have identified the technical trigger and are currently developing a mitigation plan to mitigate the impact to the custom retention settings. All custom retention jobs have been put on hold as the team works to address this issue. We apologize for the confusion, and thank you for bearing with us while we work through this issue.&nbsp;</p>",
+    "date_created": "2026-08-14T13:20:26-07:00"
+   },
+   {
+    "body": "<p>We're continuing to investigate an issue affecting a subset of channels with custom message retention settings. Custom channel retention settings have been restored for affected customers. Custom retention jobs remain on hold for some customers as we work to fully resolve the underlying cause regarding the custom message retention issues.</p>",
+    "date_created": "2026-08-14T14:39:25-07:00"
+   },
+   {
+    "body": "<p>We're continuing our restoration efforts regarding this issue affecting a subset of channels with custom message retention settings. While we work to resolve this issue, data retention processing remains paused for affected customers.&nbsp;</p><p><br></p><p>We will provide another update as additional information becomes available.</p>",
+    "date_created": "2026-08-17T14:57:51-07:00"
+   },
+   {
+    "body": "<p>We're continuing to work on restoring messages, message edits, and file shares for a limited number of workspaces that were affected by an issue with custom data retention settings. We've fixed what triggered the issue and are running data recovery using backup restoration methods. Custom retention settings have been restored for impacted channels, and we're gradually re-enabling retention jobs.</p><p>We will provide another update as additional information becomes available.</p>",
+    "date_created": "2026-08-20T15:54:59-07:00"
+   },
+   {
+    "body": "<p>We’re continuing our work to restore the remaining message data affected by this issue. Our teams have made progress developing and validating the recovery process for messages, message edits, and shared files. We’re addressing additional technical dependencies and completing validation before proceeding with the next stages of restoration.</p><p>We’ll continue to provide updates as we make progress.</p>",
+    "date_created": "2026-08-25T13:55:43-07:00"
+   },
+   {
+    "body": "<p>We’re continuing our work to restore the remaining message data affected by this issue. We’ve made further progress across the recovery processes for messages, message edits, and shared files. Validation of the message-edit recovery process has identified additional adjustments needed before restoration proceeds, while preparation and validation for message recovery continue. We’ve also completed additional development work supporting shared-file restoration, including handling for shared channels.</p><p>Custom retention processing has been re-enabled for affected active workspaces. We’ll continue to provide updates as restoration and validation progress.</p>",
+    "date_created": "2026-08-27T11:58:04-07:00"
+   },
+   {
+    "body": "<p>We continue to restore batches of messages, message edits, and shared files. Each batch requires careful planning, monitoring, and validation to ensure the affected messages are accurately restored. Custom retention processing remains re-enabled for affected active workspaces. Thank you for bearing with us while we continue to work through this complex and nuanced issue.&nbsp;</p><p>More updates will come as restoration and validation progress.</p>",
+    "date_created": "2026-09-01T15:51:21-07:00"
+   },
+   {
+    "body": "<p>We’ve made further progress restoring messages, message edits, and shared files affected by this issue. We identified and resolved a technical limit that was slowing recovery for some accounts, and recovery for Slack Connect workspaces is now underway. Message edit restoration is nearing completion for affected workspaces. We’re continuing to validate restored data as recovery progresses.</p><p>We’ll provide another update as significant progress is made.</p><p><br></p>",
+    "date_created": "2026-09-04T10:00:57-07:00"
+   },
+   {
+    "body": "<p>We've made further progress restoring message data across affected teams and channels, with most batches now complete. We've deployed a tool to correct thread reply links affected during the restore process and are running it now. Slack Connect message restoration is resuming production runs, with results being closely monitored.&nbsp; We'll provide an update as soon as new information becomes available.</p>",
+    "date_created": "2026-09-08T19:37:23-07:00"
+   },
+   {
+    "body": "<p>We’ve completed message data restoration across affected teams and channels, and are now focused on restoring file shares which should be the last step towards resolution.&nbsp;</p><p>We'll provide another update as soon as new information becomes available.</p>",
+    "date_created": "2026-09-11T08:53:33-07:00"
+   },
+   {
+    "body": "<p>We've completed restoring shared files for all remaining affected workspaces and restored and verified all affected data. If you still can't see previous content, please reload Slack using Command + Shift + R (Mac) or Ctrl + Shift + R (Windows/Linux). Thank you for your patience while we sorted out this issue.</p>",
+    "date_created": "2026-09-14T15:31:02-07:00"
+   }
+  ],
+  "services": [
+   "Messaging",
+   "Workspace/Org Administration"
+  ]
+ },
+ {
+  "id": 1578,
+  "title": "Some customers experiencing blurry image previews and download issues",
+  "type": "incident",
+  "status": "resolved",
+  "url": "https://slack-status.com/2026-09/f171324a097abb9a",
+  "date_created": "2026-09-12T04:04:17-07:00",
+  "date_updated": "2026-09-12T13:00:00-07:00",
+  "notes": [
+   {
+    "body": "<p>We're aware there's an issue where a subset of customers are experiencing blurry images which can't be downloaded, this is happening across all clients. We're actively working to understand the cause, scope, fix, or other details.&nbsp;</p>",
+    "date_created": "2026-09-12T04:04:17-07:00"
+   },
+   {
+    "body": "<p>We've identified a likely technical trigger connected to a recent image-rendering service change.</p><ul><li><strong>Current status and actions being taken: </strong>We have identified a likely technical trigger — a recent thumbnail-sharpening change to the image-rendering service. We're working to validate this, and are evaluating the rollback of the change as a possible fix.</li><li><strong>Estimated time to resolution: </strong>We<strong> </strong>are still confirming the technical trigger before a fix can be scoped.</li><li><strong>Scope: </strong>Affects a subset of customers across desktop, web, and mobile clients</li><li><strong>Current impact to end users: </strong>Images uploaded before roughly 9:30 PM GMT on Sep 11 appear blurry in previews and fail to download. Newly uploaded images are unaffected.</li><li><strong>Known workarounds: </strong>None identified yet.</li></ul><p>We appreciate your patience as we sort this out.</p>",
+    "date_created": "2026-09-12T04:29:49-07:00"
+   },
+   {
+    "body": "<p><strong>We have rolled back the code change that caused the issue in the production environment. Validation is in progress.<br></strong><br></p><ul><li><strong>Current status and actions being taken: We </strong>confirmed the technical trigger (a thumbnail-sharpening code change) and completed a rollback in the production environment after successfully testing the fix in the test environment. We are performing additional validations to confirm the fix was successful.</li><li><strong>Estimated time to resolution: </strong>We do not have and estimated time frame at the moment,.</li><li><strong>Scope: </strong>Affects a subset of customers across desktop, web, and mobile clients;&nbsp;</li><li><strong>Current impact to end users: </strong>Images uploaded before roughly 9:30 PM GMT on Sep 11 appear blurry in previews and fail to download. Newly uploaded images are unaffected.&nbsp;</li></ul><p>We appreciate your patience as we sort this out.</p>",
+    "date_created": "2026-09-12T05:52:08-07:00"
+   },
+   {
+    "body": "<p>T<strong>he earlier rollback did not resolve the issue, and investigation has </strong>been redirected<strong> to a file-serving problem rather than the thumbnail-generation change.</strong></p><ul><li><strong>Current status and actions being taken: </strong>The rollback of the thumbnail-sharpening change did not fix the issue. We have revised the technical trigger assessment to a file-serving problem, where the system returns near-empty successful responses instead of full image data. We are investigating file storage and access-policy changes, and gathering file details from affected customers to pinpoint the cause.</li><li><strong>Estimated time to resolution: </strong>&nbsp;No confirmed estimate yet; the team is still narrowing down the cause following the pivot to file serving.</li><li><strong>Scope: </strong>Affects a subset of customers across desktop, web, and mobile clients.</li><li><strong>Current impact to end users: </strong>Images uploaded before 9:30 PM GMT on Sep 11 appear blurry in previews and fail to download. Newly uploaded images are unaffected. The earlier rollback did not change this — previously affected images remained blurry and undownloadable.<strong>&nbsp;</strong></li></ul><p>We appreciate your patience as we sort this out.</p>",
+    "date_created": "2026-09-12T07:10:13-07:00"
+   },
+   {
+    "body": "<p><strong>We have confirmed the technical trigger and are preparing a fix</strong></p><ul><li><strong>Current status and actions being taken: We </strong>confirmed the technical trigger — a code change that caused older file records to lose their stored file names, breaking retrieval of existing images. The team is preparing a targeted fix to restore file names correctly when reading older files. The affected files are expected to recover automatically once the fix is deployed.</li><li><strong>Estimated time to resolution: </strong>We don't have an estimate yet.</li><li><strong>Scope: </strong>Affects a subset of customers across desktop, web, and mobile clients.</li><li><strong>Current impact to end users: </strong>Images uploaded before roughly 9:30 PM GMT on Sep 11 appear blurry in previews and fail to download. Newly uploaded images are unaffected. Previously affected images remain blurry and undownloadable.</li></ul><p>We appreciate your patience as we sort this out.</p>",
+    "date_created": "2026-09-12T08:24:18-07:00"
+   },
+   {
+    "body": "<p>Some customers experienced blurry images that couldn't be downloaded across all clients, affecting files uploaded before a recent file storage update. We deployed a fix restoring proper file access, and confirmed it resolved the issue for affected customers. We apologize for how this incident affected you and your business. We will undertake a full investigation of the incident, establishing the technical trigger, the underlying cause, and preventive action to avoid a repeat in the future.</p>",
+    "date_created": "2026-09-12T13:00:00-07:00"
+   }
+  ],
+  "services": [
+   "Files"
+  ]
+ },
+ {
+  "id": 1577,
+  "title": "Trouble loading Workspace-level Apps & Workflows settings page is returning blank pages",
+  "type": "incident",
+  "status": "resolved",
+  "url": "https://slack-status.com/2026-09/c8ec111fea759b78",
+  "date_created": "2026-09-09T17:34:21-07:00",
+  "date_updated": "2026-09-09T20:14:18-07:00",
+  "notes": [
+   {
+    "body": "<p>We’re aware of an issue affecting Workspace-level Apps &amp; Workflows settings page. Users are seeing a blank page affecting these admin features. We’re actively investigating this issue and will provide an update in 30 minutes or sooner if more information becomes available.&nbsp;</p>",
+    "date_created": "2026-09-09T17:34:21-07:00"
+   },
+   {
+    "body": "<p>We've engaged our engineering team to assist in the investigation. We’re continuing to work on understanding the issue. We’ll provide an update in 30 minutes or sooner if more information becomes available.</p>",
+    "date_created": "2026-09-09T17:58:36-07:00"
+   },
+   {
+    "body": "<p>We've identified the cause of this issue, and our engineers are testing a fix. We'll provide an update in 30 minutes or sooner if additional information becomes available.</p>",
+    "date_created": "2026-09-09T18:29:53-07:00"
+   },
+   {
+    "body": "<p>The fix has been validated in our test environment and is now being deployed. We will provide an update once the deployment is complete, or sooner if additional information becomes available.</p>",
+    "date_created": "2026-09-09T18:37:07-07:00"
+   },
+   {
+    "body": "<p>This incident has been resolved. The engineering team has confirmed that the fix has been successfully deployed.</p><p>We apologize for any disruptions this may have caused to your day.</p>",
+    "date_created": "2026-09-09T20:14:18-07:00"
+   }
+  ],
+  "services": [
+   "Apps/Integrations/APIs"
+  ]
+ },
+ {
+  "id": 1575,
+  "title": "Trouble Using Search Bar For Some Admins",
+  "type": "incident",
+  "status": "resolved",
+  "url": "https://slack-status.com/2026-08/1db1f200d420086a",
+  "date_created": "2026-08-06T15:22:35-07:00",
+  "date_updated": "2026-08-06T18:08:09-07:00",
+  "notes": [
+   {
+    "body": "<p>Since approximately 21:00 UTC on August 6, some admins have been unable to click or use the search bar on org dashboard pages. We are aware of this issue and are actively investigating the cause. We'll provide an update in 60 minutes or sooner if additional information becomes available.&nbsp;</p>",
+    "date_created": "2026-08-06T15:22:35-07:00"
+   },
+   {
+    "body": "<p>We have identified the cause of this issue as a recent change and have started the process of rolling back the problematic change.&nbsp;</p>",
+    "date_created": "2026-08-06T16:11:27-07:00"
+   },
+   {
+    "body": "<p>We've completed the rollback of the recent change that was the trigger of the issue. The Search bar and Admin dashboard&nbsp; is restored for all users.<br>We apologize for the inconvenience caused to you and your business.</p><p><br></p>",
+    "date_created": "2026-08-06T18:07:04-07:00"
+   }
+  ],
+  "services": [
+   "Search"
+  ]
+ }
+]

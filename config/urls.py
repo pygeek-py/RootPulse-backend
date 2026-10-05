@@ -23,6 +23,7 @@ urlpatterns = [
     path("api/v1/", include("notifications.urls")),
     path("api/v1/", include("analytics.urls")),
     path("api/v1/", include("deploys.urls")),
+    path("api/v1/", include("providers.urls")),
     path("api/v1/heartbeat/<str:token>/", HeartbeatView.as_view(), name="heartbeat"),
     path("internal/run-due-checks/", RunDueChecksView.as_view(), name="run-due-checks"),
     path("internal/run-rollups/", RunRollupsView.as_view(), name="run-rollups"),

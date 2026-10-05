@@ -47,13 +47,26 @@ class RunDueChecksView(APIView):
 
         summary = run_scheduler_once()
         logger.info("scheduler pass: %s", summary.as_dict())
+        # Third-party status pages are read in the same pass (before alerts, so a provider
+        # incident is announced in this pass rather than the next).
+        from providers.poller import run_provider_polls_once
+
+        providers = run_provider_polls_once()
+        logger.info("provider pass: %s", providers.as_dict())
+
         # Alerts go out in the same trigger, so they arrive seconds after the check that
         # found the problem rather than waiting for the next one.
         from notifications.dispatcher import run_notifications_once
 
         notifications = run_notifications_once()
         logger.info("notification pass: %s", notifications.as_dict())
-        return Response({**summary.as_dict(), "notifications": notifications.as_dict()})
+        return Response(
+            {
+                **summary.as_dict(),
+                "providers": providers.as_dict(),
+                "notifications": notifications.as_dict(),
+            }
+        )
 
 
 class RunRollupsView(APIView):

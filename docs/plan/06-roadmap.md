@@ -228,6 +228,8 @@
 
 **Checkpoint:** subscribing to GitHub's status feed and seeing their real current status reflected accurately.
 
+> **Status: built.** See the Dependency monitoring section of the README. All 20 providers read live; the replay of GitHub's real "Actions Job Delays" incident is a test (opens and alerts when replayed mid-incident, resolves and notifies afterwards).
+
 ---
 
 ### Phase 12 — Status Pages

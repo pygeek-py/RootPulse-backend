@@ -286,7 +286,7 @@ class DeliveryViewSet(mixins.ListModelMixin, GenericViewSet):
         user = self.request.user
         qs = (
             NotificationDelivery.objects.filter(contact__user=user)
-            .select_related("monitor")
+            .select_related("monitor", "provider_incident__provider")
             .order_by("-created_at", "-id")
         )
         params = self.request.query_params

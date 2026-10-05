@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "notifications",
     "analytics",
     "deploys",
+    "providers",
 ]
 
 MIDDLEWARE = [
@@ -212,6 +213,7 @@ SPECTACULAR_SETTINGS = {
     "ENUM_NAME_OVERRIDES": {
         "StatusEnum": "monitoring.models.Monitor.Status",
         "TypeEnum": "monitoring.models.Monitor.Type",
+        "ProviderStatusEnum": "providers.models.Provider.Status",
         "DeploySourceTypeEnum": "deploys.models.DeploySource.Type",
         "DeliveryStatusEnum": "notifications.models.NotificationDelivery.Status",
         "DeliveryEventEnum": "notifications.models.NotificationDelivery.Event",
@@ -343,6 +345,18 @@ ROLLUP_LOOKBACK_HOURS = 2
 DEPLOY_CORRELATION_WINDOW_SECONDS = int(os.environ.get("DEPLOY_CORRELATION_WINDOW_SECONDS", "300"))
 DEPLOY_MAX_BODY_BYTES = 256 * 1024
 MAX_DEPLOY_SOURCES_PER_USER = int(os.environ.get("MAX_DEPLOY_SOURCES_PER_USER", "10"))
+
+# Dependency monitoring (providers/). Tracked providers are read this often (the scheduler
+# trigger runs every five minutes); untracked ones only occasionally, to keep the browse list fresh.
+PROVIDER_POLL_SECONDS = int(os.environ.get("PROVIDER_POLL_SECONDS", "300"))
+PROVIDER_IDLE_POLL_SECONDS = int(os.environ.get("PROVIDER_IDLE_POLL_SECONDS", "1800"))
+PROVIDER_HTTP_TIMEOUT = 10
+PROVIDER_WORKERS = 8
+PROVIDER_BATCH_SIZE = 40
+PROVIDER_PASS_BUDGET_SECONDS = 40
+PROVIDER_UNKNOWN_AFTER_FAILURES = 3  # unreadable this many times in a row = status "unknown"
+# An incident older than this when we first see it (or that is still "open" long after) isn't news.
+PROVIDER_NOTIFY_MAX_AGE_HOURS = 12
 
 # Passwordless sign-in (accounts/passwordless.py).
 EMAIL_CHALLENGE_TTL_SECONDS = 15 * 60

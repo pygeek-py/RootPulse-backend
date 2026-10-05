@@ -1,0 +1,575 @@
+{
+ "page": {
+  "id": "kctbh9vrtdwd",
+  "name": "GitHub",
+  "url": "https://www.githubstatus.com",
+  "time_zone": "Etc/UTC",
+  "updated_at": "2026-10-05T18:49:35.705Z"
+ },
+ "incidents": [
+  {
+   "id": "2dpbcq5j165n",
+   "name": "Actions Job Delays",
+   "status": "resolved",
+   "created_at": "2026-10-01T14:47:48.138Z",
+   "updated_at": "2026-10-01T17:56:54.289Z",
+   "monitoring_at": "2026-10-01T15:10:52.227Z",
+   "resolved_at": "2026-10-01T17:56:54.260Z",
+   "impact": "minor",
+   "shortlink": "https://stspg.io/kdqxfjn5qg6q",
+   "started_at": "2026-10-01T14:47:48.132Z",
+   "page_id": "kctbh9vrtdwd",
+   "incident_updates": [
+    {
+     "id": "x5hd07s6r4mh",
+     "status": "resolved",
+     "body": "This incident has been resolved. Thank you for your patience and understanding as we addressed this issue. A detailed root cause analysis will be shared as soon as it is available.",
+     "incident_id": "2dpbcq5j165n",
+     "created_at": "2026-10-01T17:56:54.260Z",
+     "updated_at": "2026-10-01T17:56:54.260Z",
+     "display_at": "2026-10-01T17:56:54.260Z",
+     "affected_components": [
+      {
+       "code": "br0l2tvcx85d",
+       "name": "Actions",
+       "old_status": "degraded_performance",
+       "new_status": "operational"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "w75t1tps2d9r",
+     "status": "investigating",
+     "body": "GitHub Actions experienced degraded performance for some hosted runners due to throttling within an upstream Azure dependency. Service capacity has recovered, and we are continuing to monitor while working with Azure on the underlying condition.",
+     "incident_id": "2dpbcq5j165n",
+     "created_at": "2026-10-01T17:50:54.351Z",
+     "updated_at": "2026-10-01T17:50:54.351Z",
+     "display_at": "2026-10-01T17:50:54.351Z",
+     "affected_components": [
+      {
+       "code": "br0l2tvcx85d",
+       "name": "Actions",
+       "old_status": "degraded_performance",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "4nl77h1pzjl6",
+     "status": "investigating",
+     "body": "We are currently applying a mitigation and anticipate recovery within thirty minutes.",
+     "incident_id": "2dpbcq5j165n",
+     "created_at": "2026-10-01T16:48:51.025Z",
+     "updated_at": "2026-10-01T16:48:51.025Z",
+     "display_at": "2026-10-01T16:48:51.025Z",
+     "affected_components": [
+      {
+       "code": "br0l2tvcx85d",
+       "name": "Actions",
+       "old_status": "degraded_performance",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "0h075hpxvs70",
+     "status": "investigating",
+     "body": "We have identified an issue with our upstream provider which is causing Actions requests to 429 which is creating the delays. We have escalated to the owning team and are investigating how to mitigate the 429s.",
+     "incident_id": "2dpbcq5j165n",
+     "created_at": "2026-10-01T16:10:24.539Z",
+     "updated_at": "2026-10-01T16:10:24.539Z",
+     "display_at": "2026-10-01T16:10:24.539Z",
+     "affected_components": [
+      {
+       "code": "br0l2tvcx85d",
+       "name": "Actions",
+       "old_status": "degraded_performance",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "mscgswc68m9h",
+     "status": "investigating",
+     "body": "We are seeing a reoccurrence in run-start delays, and are continuing to investigate to issue. Customers will potentially experience delays of up to ten minutes.",
+     "incident_id": "2dpbcq5j165n",
+     "created_at": "2026-10-01T15:29:46.969Z",
+     "updated_at": "2026-10-01T15:29:46.969Z",
+     "display_at": "2026-10-01T15:29:46.969Z",
+     "affected_components": [
+      {
+       "code": "br0l2tvcx85d",
+       "name": "Actions",
+       "old_status": "degraded_performance",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "cz8w7f6ss4wx",
+     "status": "investigating",
+     "body": "Actions is experiencing degraded performance. We are continuing to investigate.",
+     "incident_id": "2dpbcq5j165n",
+     "created_at": "2026-10-01T15:20:46.089Z",
+     "updated_at": "2026-10-01T15:20:46.089Z",
+     "display_at": "2026-10-01T15:20:46.089Z",
+     "affected_components": [
+      {
+       "code": "br0l2tvcx85d",
+       "name": "Actions",
+       "old_status": "operational",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "snzrhgh05tjd",
+     "status": "monitoring",
+     "body": "The degradation affecting Actions has been mitigated. We are monitoring to ensure stability.",
+     "incident_id": "2dpbcq5j165n",
+     "created_at": "2026-10-01T15:10:52.227Z",
+     "updated_at": "2026-10-01T15:10:52.227Z",
+     "display_at": "2026-10-01T15:10:52.227Z",
+     "affected_components": [
+      {
+       "code": "br0l2tvcx85d",
+       "name": "Actions",
+       "old_status": "degraded_performance",
+       "new_status": "operational"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "q2qxq3swpv6v",
+     "status": "investigating",
+     "body": "Run-start delays on Ubuntu runners have been resolved. We are investigating run-start delays on Windows runners and will share more information as it becomes available.",
+     "incident_id": "2dpbcq5j165n",
+     "created_at": "2026-10-01T15:02:41.043Z",
+     "updated_at": "2026-10-01T15:02:41.043Z",
+     "display_at": "2026-10-01T15:02:41.043Z",
+     "affected_components": [
+      {
+       "code": "br0l2tvcx85d",
+       "name": "Actions",
+       "old_status": "degraded_performance",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "nn05nqxkjyb7",
+     "status": "investigating",
+     "body": "We have identified the cause of increased Actions run start delays on Ubuntu runners and are actively deploying a fix. Customers may continue to experience intermittent delays while the mitigation rolls out and service metrics return to normal.",
+     "incident_id": "2dpbcq5j165n",
+     "created_at": "2026-10-01T14:54:13.101Z",
+     "updated_at": "2026-10-01T14:54:13.101Z",
+     "display_at": "2026-10-01T14:54:13.101Z",
+     "affected_components": [
+      {
+       "code": "br0l2tvcx85d",
+       "name": "Actions",
+       "old_status": "degraded_performance",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "kzfh6qs28nnb",
+     "status": "investigating",
+     "body": "We are investigating reports of degraded performance for Actions",
+     "incident_id": "2dpbcq5j165n",
+     "created_at": "2026-10-01T14:47:48.228Z",
+     "updated_at": "2026-10-01T14:47:48.228Z",
+     "display_at": "2026-10-01T14:47:48.228Z",
+     "affected_components": [
+      {
+       "code": "br0l2tvcx85d",
+       "name": "Actions",
+       "old_status": "operational",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    }
+   ],
+   "components": [
+    {
+     "id": "br0l2tvcx85d",
+     "name": "Actions",
+     "status": "operational",
+     "created_at": "2019-11-13T18:02:19.432Z",
+     "updated_at": "2026-10-01T17:56:54.207Z",
+     "position": 7,
+     "description": "Workflows, Compute and Orchestration for GitHub Actions",
+     "showcase": true,
+     "start_date": null,
+     "group_id": null,
+     "page_id": "kctbh9vrtdwd",
+     "group": false,
+     "only_show_if_degraded": false
+    }
+   ],
+   "reminder_intervals": null
+  },
+  {
+   "id": "c8466lzvnmsv",
+   "name": "Elevated request latency",
+   "status": "resolved",
+   "created_at": "2026-10-01T13:37:33.066Z",
+   "updated_at": "2026-10-05T18:49:35.685Z",
+   "monitoring_at": "2026-10-01T13:51:20.147Z",
+   "resolved_at": "2026-10-01T13:57:59.327Z",
+   "impact": "minor",
+   "shortlink": "https://stspg.io/cz0ngh11q0tf",
+   "started_at": "2026-10-01T13:37:33.060Z",
+   "page_id": "kctbh9vrtdwd",
+   "incident_updates": [
+    {
+     "id": "qgtjpc4z29gv",
+     "status": "resolved",
+     "body": "On October 1, 2026, between 13:04 UTC and 13:34 UTC, users experienced two periods of slow page loads and intermittent request failures on GitHub.com. On average, the error rate was 0.52% and peaked at 6.13%. An unusually high volume of incoming traffic placed additional load on our traffic-handling infrastructure, delaying requests before they reached our application servers. Performance returned to normal as the traffic subsided, and we have since applied additional traffic filtering to protect against similar traffic. We are improving alerting for delays in our traffic-handling infrastructure and strengthening our automated traffic protections to reduce our time to detection and mitigation.",
+     "incident_id": "c8466lzvnmsv",
+     "created_at": "2026-10-01T13:57:59.327Z",
+     "updated_at": "2026-10-05T18:49:35.682Z",
+     "display_at": "2026-10-01T13:57:59.327Z",
+     "affected_components": null,
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "br98jtlgvt6p",
+     "status": "monitoring",
+     "body": "The degradation has been mitigated. We are monitoring to ensure stability.",
+     "incident_id": "c8466lzvnmsv",
+     "created_at": "2026-10-01T13:51:20.147Z",
+     "updated_at": "2026-10-01T13:51:20.147Z",
+     "display_at": "2026-10-01T13:51:20.147Z",
+     "affected_components": null,
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "bbq92lpnntyv",
+     "status": "investigating",
+     "body": "We are investigating recurrent periods of elevated latency affecting web requests. We’ll share updates as more information becomes available.",
+     "incident_id": "c8466lzvnmsv",
+     "created_at": "2026-10-01T13:39:10.094Z",
+     "updated_at": "2026-10-01T13:39:10.094Z",
+     "display_at": "2026-10-01T13:39:10.094Z",
+     "affected_components": null,
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "7ybsr4d959gh",
+     "status": "investigating",
+     "body": "We are investigating reports of impacted performance for some GitHub services.",
+     "incident_id": "c8466lzvnmsv",
+     "created_at": "2026-10-01T13:37:33.128Z",
+     "updated_at": "2026-10-01T13:37:33.128Z",
+     "display_at": "2026-10-01T13:37:33.128Z",
+     "affected_components": null,
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    }
+   ],
+   "components": [],
+   "reminder_intervals": null
+  },
+  {
+   "id": "dqn46wtvbdzv",
+   "name": "[Retroactive] Actions workflow run failures after deployment gate approvals",
+   "status": "resolved",
+   "created_at": "2026-10-01T02:00:00.000Z",
+   "updated_at": "2026-10-01T11:34:33.960Z",
+   "monitoring_at": null,
+   "resolved_at": "2026-10-01T02:00:00.000Z",
+   "impact": "minor",
+   "shortlink": "https://stspg.io/f0yg8jk2gm80",
+   "started_at": "2026-10-01T11:34:16.856Z",
+   "page_id": "kctbh9vrtdwd",
+   "incident_updates": [
+    {
+     "id": "yrcmmj2w3yxt",
+     "status": "resolved",
+     "body": "On October 1, around 02:00 UTC, an isolated infrastructure failure caused GitHub Actions to lose execution state for a small number of existing workflow runs. Affected runs may remain stuck, fail deployment approvals, or return errors when cancelled. Service connectivity has recovered, but the lost state cannot be restored by retrying an approval.\n\n\nIf you're affected, you can trigger a new run or contact GitHub Support with links to your stuck runs so we can unblock them. Once cleared, select \"Re-run all jobs.\" This preserves the workflow run ID but starts a new attempt, rebuilds artifacts, and requires fresh deployment approvals. Before rerunning, check whether any deployment steps already completed to avoid repeating changes.",
+     "incident_id": "dqn46wtvbdzv",
+     "created_at": "2026-10-01T11:34:16.913Z",
+     "updated_at": "2026-10-01T11:34:16.913Z",
+     "display_at": "2026-10-01T02:00:00.000Z",
+     "affected_components": null,
+     "deliver_notifications": false,
+     "custom_tweet": null,
+     "tweet_id": null
+    }
+   ],
+   "components": [],
+   "reminder_intervals": null
+  },
+  {
+   "id": "169pg72gg9jr",
+   "name": "Copilot Code Review is unable to complete reviews",
+   "status": "resolved",
+   "created_at": "2026-09-28T21:16:39.012Z",
+   "updated_at": "2026-10-01T16:12:43.172Z",
+   "monitoring_at": null,
+   "resolved_at": "2026-09-28T22:08:20.216Z",
+   "impact": "critical",
+   "shortlink": "https://stspg.io/phqvtmdm3y2m",
+   "started_at": "2026-09-28T21:16:39.006Z",
+   "page_id": "kctbh9vrtdwd",
+   "incident_updates": [
+    {
+     "id": "sm8gcn9z29ns",
+     "status": "resolved",
+     "body": "On September 28, 2026, between 19:23 UTC and 22:08 UTC the Copilot Code Review service was degraded and pull request reviews did not complete in all environments. On average, approximately 70% of requested reviews did not complete. Reviews requested during this window were not automatically retried, and users needed to re-request a review from their pull request. This was due to a change in a dependent service that stopped delivering data Copilot Code Review needs to complete a review. Review completion is an inherently delayed signal, because each review job takes time to start and finish, so it took longer to detect the impact.<br /><br />We mitigated the incident by reverting the change.<br /><br />We are working to add a faster signal for reviews that fail to complete, add deployment validation that confirms a Copilot Code Review completes end to end, improve how we track internal dependencies between services, and make our deployment pipeline more reliable to reduce our time to detection and mitigation of issues like this one in the future.",
+     "incident_id": "169pg72gg9jr",
+     "created_at": "2026-09-28T22:08:20.216Z",
+     "updated_at": "2026-10-01T16:12:43.168Z",
+     "display_at": "2026-09-28T22:08:20.216Z",
+     "affected_components": null,
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "trtnpghqs12y",
+     "status": "investigating",
+     "body": "Copilot Code review has recovered, for reviews that were previously not successful you can re-request review from your PR.",
+     "incident_id": "169pg72gg9jr",
+     "created_at": "2026-09-28T22:08:12.851Z",
+     "updated_at": "2026-09-28T22:08:12.851Z",
+     "display_at": "2026-09-28T22:08:12.851Z",
+     "affected_components": null,
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "vq5svsgxvry9",
+     "status": "investigating",
+     "body": "Revert of the impacted change is in flight, expect full recovery once the deployment is done.",
+     "incident_id": "169pg72gg9jr",
+     "created_at": "2026-09-28T21:23:59.226Z",
+     "updated_at": "2026-09-28T21:23:59.226Z",
+     "display_at": "2026-09-28T21:23:59.226Z",
+     "affected_components": null,
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "9gt1s7x8nl12",
+     "status": "investigating",
+     "body": "We are investigating reports of impacted performance for some GitHub services.",
+     "incident_id": "169pg72gg9jr",
+     "created_at": "2026-09-28T21:16:39.060Z",
+     "updated_at": "2026-09-28T21:16:39.060Z",
+     "display_at": "2026-09-28T21:16:39.060Z",
+     "affected_components": null,
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    }
+   ],
+   "components": [],
+   "reminder_intervals": null
+  },
+  {
+   "id": "nlxnbqnkdzdl",
+   "name": "Degradation with Gemini 3.8 Flash",
+   "status": "resolved",
+   "created_at": "2026-09-16T07:20:59.980Z",
+   "updated_at": "2026-09-22T09:37:08.386Z",
+   "monitoring_at": "2026-09-16T11:45:34.367Z",
+   "resolved_at": "2026-09-16T17:48:49.246Z",
+   "impact": "major",
+   "shortlink": "https://stspg.io/hsjy12f57b24",
+   "started_at": "2026-09-16T07:20:59.972Z",
+   "page_id": "kctbh9vrtdwd",
+   "incident_updates": [
+    {
+     "id": "dkg6ntmqrx13",
+     "status": "resolved",
+     "body": "On September 16, 2026, between 04:40 and 11:45 UTC, the Gemini 3.8 Flash model in GitHub Copilot experienced degraded availability. Requests to this model failed at an average rate of 6.4%, and the impact was highest during peak traffic hours. Other Copilot models were not affected. Users could continue to work with a different model or with 'Auto'.<br /><br />The degradation was caused due to a capacity issue with an upstream model provider. Failure rates returned to normal as the daily traffic peak passed. We monitored the model until it was healthy and resolved the incident at 17:48 UTC. We are working to make our systems resilient to cover peak demand for all the Copilot models.",
+     "incident_id": "nlxnbqnkdzdl",
+     "created_at": "2026-09-16T17:48:49.246Z",
+     "updated_at": "2026-09-22T09:37:08.381Z",
+     "display_at": "2026-09-16T17:48:49.246Z",
+     "affected_components": [
+      {
+       "code": "cnnb39dkkk82",
+       "name": "Copilot AI Model Providers",
+       "old_status": "operational",
+       "new_status": "operational"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "fhf0pt4d6l22",
+     "status": "monitoring",
+     "body": "The degradation affecting Copilot AI Model Providers has been mitigated. We are monitoring to ensure stability.",
+     "incident_id": "nlxnbqnkdzdl",
+     "created_at": "2026-09-16T11:45:34.367Z",
+     "updated_at": "2026-09-16T11:45:34.367Z",
+     "display_at": "2026-09-16T11:45:34.367Z",
+     "affected_components": [
+      {
+       "code": "cnnb39dkkk82",
+       "name": "Copilot AI Model Providers",
+       "old_status": "degraded_performance",
+       "new_status": "operational"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "jzqtqvsy4w85",
+     "status": "investigating",
+     "body": "Copilot AI Model Providers is experiencing degraded performance. We are continuing to investigate.",
+     "incident_id": "nlxnbqnkdzdl",
+     "created_at": "2026-09-16T10:58:41.042Z",
+     "updated_at": "2026-09-16T10:58:41.042Z",
+     "display_at": "2026-09-16T10:58:41.042Z",
+     "affected_components": [
+      {
+       "code": "cnnb39dkkk82",
+       "name": "Copilot AI Model Providers",
+       "old_status": "partial_outage",
+       "new_status": "degraded_performance"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "lmrhhrfsn0ch",
+     "status": "investigating",
+     "body": "Copilot AI Model Providers is experiencing degraded performance. We are continuing to investigate.",
+     "incident_id": "nlxnbqnkdzdl",
+     "created_at": "2026-09-16T08:28:57.275Z",
+     "updated_at": "2026-09-16T08:28:57.275Z",
+     "display_at": "2026-09-16T08:28:57.275Z",
+     "affected_components": [
+      {
+       "code": "cnnb39dkkk82",
+       "name": "Copilot AI Model Providers",
+       "old_status": "partial_outage",
+       "new_status": "partial_outage"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    },
+    {
+     "id": "q07t106x8dh0",
+     "status": "investigating",
+     "body": "We are investigating reports of degraded availability for Copilot AI Model Providers",
+     "incident_id": "nlxnbqnkdzdl",
+     "created_at": "2026-09-16T07:21:00.055Z",
+     "updated_at": "2026-09-16T07:21:00.055Z",
+     "display_at": "2026-09-16T07:21:00.055Z",
+     "affected_components": [
+      {
+       "code": "cnnb39dkkk82",
+       "name": "Copilot AI Model Providers",
+       "old_status": "operational",
+       "new_status": "partial_outage"
+      }
+     ],
+     "deliver_notifications": true,
+     "custom_tweet": null,
+     "tweet_id": null
+    }
+   ],
+   "components": [
+    {
+     "id": "cnnb39dkkk82",
+     "name": "Copilot AI Model Providers",
+     "status": "operational",
+     "created_at": "2026-04-17T12:33:08.827Z",
+     "updated_at": "2026-09-16T11:45:34.336Z",
+     "position": 12,
+     "description": null,
+     "showcase": true,
+     "start_date": "2026-04-17",
+     "group_id": null,
+     "page_id": "kctbh9vrtdwd",
+     "group": false,
+     "only_show_if_degraded": false
+    }
+   ],
+   "reminder_intervals": null
+  },
+  {
+   "id": "wms44hv62t3p",
+   "name": "Degraded Git Operations over SSH",
+   "status": "resolved",
+   "created_at": "2026-08-21T14:00:00.000Z",
+   "updated_at": "2026-08-24T07:19:23.053Z",
+   "monitoring_at": null,
+   "resolved_at": "2026-08-21T14:00:00.000Z",
+   "impact": "none",
+   "shortlink": "https://stspg.io/9nls6g9ln8p4",
+   "started_at": "2026-08-24T07:19:22.991Z",
+   "page_id": "kctbh9vrtdwd",
+   "incident_updates": [
+    {
+     "id": "jhq44wgl2nff",
+     "status": "resolved",
+     "body": "On August 21, 2026, between 14:00 and 14:07 UTC, dotcom Git operations over SSH were degraded. Successful Git operations over SSH fell by more than 95% for during the peak impact window, making clone, fetch, or push over SSH effectively unavailable to most users for approximately four minutes. Git operations over HTTPS were not affected.  \n\nThe incident was caused by a software defect in our load-balancing infrastructure that was triggered by a configuration change. The defect only occurred when connections passed through multiple layers of load balancers running the new configuration, which meant it was not detected during canary testing. \n\nWe mitigated the incident by rolling back the configuration change.  \n\nWe are adding regression coverage for multi-layer load-balancer configurations and improving monitoring and alerting for Git operations over SSH to reduce our time to detection and mitigation of similar issues in the future.",
+     "incident_id": "wms44hv62t3p",
+     "created_at": "2026-08-24T07:19:23.042Z",
+     "updated_at": "2026-08-24T07:19:23.042Z",
+     "display_at": "2026-08-21T14:00:00.000Z",
+     "affected_components": null,
+     "deliver_notifications": false,
+     "custom_tweet": null,
+     "tweet_id": null
+    }
+   ],
+   "components": [],
+   "reminder_intervals": null
+  }
+ ]
+}

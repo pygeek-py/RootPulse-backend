@@ -94,7 +94,9 @@ def _skip(delivery: Delivery, reason: str) -> str:
 def deliver(delivery_id: int, *, now: datetime | None = None) -> str:
     """Attempt one claimed delivery. Returns its resulting status."""
     now = now or timezone.now()
-    delivery = Delivery.objects.select_related("contact", "incident", "monitor").get(pk=delivery_id)
+    delivery = Delivery.objects.select_related(
+        "contact", "incident", "monitor", "provider_incident__provider"
+    ).get(pk=delivery_id)
     contact = delivery.contact
 
     if contact is None:
@@ -106,6 +108,10 @@ def deliver(delivery_id: int, *, now: datetime | None = None) -> str:
             return _skip(delivery, "It recovered before this alert was sent.")
         if delivery.monitor and services.in_maintenance(delivery.monitor, now):
             return _skip(delivery, services.IN_MAINTENANCE)
+
+    if delivery.provider_incident_id and delivery.event == Delivery.Event.OPENED:
+        if delivery.provider_incident.ended_at is not None:
+            return _skip(delivery, "It was resolved before this alert was sent.")
 
     channel = CHANNELS[delivery.channel]
     try:

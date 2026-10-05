@@ -43,6 +43,14 @@ class NotificationDelivery(models.Model):
         on_delete=models.CASCADE,
         related_name="deliveries",
     )
+    # An alert about a third-party provider's incident (dependency monitoring) instead.
+    provider_incident = models.ForeignKey(
+        "providers.ProviderIncident",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="deliveries",
+    )
     # SET_NULL: deleting a contact keeps the history of what was sent to it.
     contact = models.ForeignKey(
         "monitoring.AlertContact", null=True, on_delete=models.SET_NULL, related_name="deliveries"
@@ -73,6 +81,11 @@ class NotificationDelivery(models.Model):
                 fields=["incident", "contact", "dedupe_key"],
                 condition=Q(incident__isnull=False, contact__isnull=False),
                 name="one_delivery_per_incident_contact_event",
+            ),
+            models.UniqueConstraint(
+                fields=["provider_incident", "contact", "dedupe_key"],
+                condition=Q(provider_incident__isnull=False, contact__isnull=False),
+                name="one_delivery_per_provider_incident_contact_event",
             ),
             models.CheckConstraint(
                 condition=Q(status="pending", next_attempt_at__isnull=False) | ~Q(status="pending"),

@@ -152,7 +152,12 @@ class DeliverySerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_monitor_name(self, obj: NotificationDelivery):
-        return obj.monitor.name if obj.monitor else None
+        # What the alert was about: a monitor, or the third-party provider that had trouble.
+        if obj.monitor:
+            return obj.monitor.name
+        if obj.provider_incident_id:
+            return obj.provider_incident.provider.name
+        return None
 
 
 class ContactVerifySerializer(serializers.Serializer):

@@ -94,3 +94,19 @@ def dns(monkeypatch):
 
     monkeypatch.setattr(target_validation, "_getaddrinfo", fake_getaddrinfo)
     return table
+
+
+@pytest.fixture(autouse=True)
+def no_provider_network(monkeypatch):
+    """Provider status pages are never fetched for real in tests. The HTTP client a poll builds
+    for itself refuses every connection; tests that want feed data pass their own client."""
+    import httpx
+
+    from providers import poller
+
+    def refuse(request):
+        raise httpx.ConnectError("network disabled in tests")
+
+    monkeypatch.setattr(
+        poller, "new_client", lambda: httpx.Client(transport=httpx.MockTransport(refuse))
+    )

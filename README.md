@@ -210,3 +210,37 @@ A genuine request that isn't a successful deploy (a ping, a failed run, a previe
 Tests: 919 in total, including a signature matrix per provider (bad, missing, wrong secret, stale, tampered), replays, environment filtering, every correlation case (window edges, late deploys, closer-wins, other users and services, untagged monitors) and the stage rules.
  Per-channel tests use stubbed HTTP, so no test touches the network.
 
+
+## Dependency monitoring (Phase 11)
+
+RootPulse watches the status pages of the services you depend on and tells you through your own alert contacts, so "is it us or them?" has an answer before you start debugging. Nothing is licensed: every provider publishes a public status feed, and RootPulse reads those.
+
+**The catalogue** (`providers/catalog.py`) is curated: GitHub, npm, CircleCI, Atlassian, Sentry, Datadog, Cloudflare, Vercel, Netlify, Render, Fly.io, DigitalOcean, Google Cloud, Supabase, MongoDB Atlas, Twilio, Discord, Slack, OpenAI and Anthropic. It is synced into the database after every migrate (idempotent, so editing a name or feed URL there updates it). Stripe is left out on purpose: its public feed stopped updating in 2024, so it would report "operational" forever.
+
+**Feed formats** are not standardised, so each provider names an adapter (`providers/adapters.py`). Adapters take already-fetched JSON and return normalised incidents; they never touch the network, so every one is tested against a **real captured feed** (`tests/fixtures/providers/`).
+
+| Adapter | Used by | Reads |
+| --- | --- | --- |
+| `statuspage` | most providers (Atlassian Statuspage v2) | `/api/v2/summary.json` (required: overall status and components) and `/api/v2/incidents.json` (history) |
+| `slack` | Slack | `/api/v2.0.0/current` and `/api/v2.0.0/history` |
+| `gcp` | Google Cloud | `/incidents.json` |
+
+Real feeds are untidy, and the adapters cope with what was actually seen: an incident marked resolved *before* it started is clamped, scheduled maintenance is not treated as an outage, markdown and HTML in updates become plain text, only plain http(s) links are kept, a response over 3 MB is refused, and an incident that vanishes from a feed is closed.
+
+**Polling** is the same "table is the queue" pattern as checks and alerts. Each provider has a `next_poll_at`; `run_engine` (or `POST /internal/run-due-checks/`) claims due providers with `FOR UPDATE SKIP LOCKED` and a short lease, reads them in a small thread pool, and stores the result in bulk (one round trip, not one per incident). A provider someone tracks is read every 5 minutes, an untracked one every 30; a failing one backs off (5, 10, 20... up to 60 minutes). After three unreadable passes in a row the status becomes `unknown` rather than keeping a stale "operational", and the API reports `stale: true` so the UI can say "can't reach its status page".
+
+**Alerts** use the existing queue, dedupe, retries, delay and recovery rules, so provider incidents reach the same six channels as monitor incidents. For each subscription, an *opened* alert is raised when an incident is ongoing, its impact is at or above the subscription's `min_impact` (`none`, `minor`, `major`), and it began within `PROVIDER_NOTIFY_MAX_AGE_HOURS` (12). That age rule matters: several providers leave an old incident "open" forever, and subscribing must not fire an alert for something from last spring. A *resolved* alert goes only to contacts who actually received the opened one. Subscribing while something is already going on alerts immediately; unsubscribing cancels anything still queued. Each contact is a delivery row, unique per (incident, contact, event).
+
+**API** (all under `/api/v1/`, signed-in users only):
+
+- `GET /providers/` (`?q=`, `?category=`, `?subscribed=true`), `GET /providers/{slug}/` (components that aren't operational, recent incidents)
+- `POST /providers/{slug}/subscribe/` (`min_impact`, `alert_contact_ids`; 201 on create, 200 on update, and all your contacts by default), `DELETE /providers/{slug}/subscribe/` (204, idempotent)
+- `GET /provider-incidents/` (`?scope=subscribed|all`, `?status=ongoing|resolved`, `?provider=slug`, paginated)
+
+Two deliberate differences from the roadmap's sketch: providers are addressed by **slug** rather than id (readable URLs, stable across environments), and "my providers" is a `?subscribed=true` filter rather than a separate `/providers/subscribed` route.
+
+**Replaying a real incident** (the definition of done): `python manage.py replay_provider_feed github --doc summary=tests/fixtures/providers/github_summary.json --doc incidents=tests/fixtures/providers/github_incidents.json --as-of 2026-10-01T15:00:00Z` rewinds a captured feed to a moment in the past, ingests it, and prints the status and alerts it would have produced. The GitHub "Actions Job Delays" incident (14:47-17:56 UTC on 2026-10-01) is asserted in the tests at 15:00 (ongoing, a subscriber is alerted) and at 18:00 (resolved, the resolution is sent to those who got the alert).
+
+`python manage.py run_provider_polls_once` reads everything due once; `seed_providers` re-syncs the catalogue. Tunables (all optional): `PROVIDER_POLL_SECONDS`, `PROVIDER_IDLE_POLL_SECONDS`.
+
+Tests: adapters against the real fixtures, ingestion, the alert rules, replay, the poller (with a mocked transport; the suite blocks real network), and the API.

@@ -30,3 +30,5 @@ workers/**/node_modules
 
 # local dev server logs
 .logs/
+*.dev.log
+*.dev.err.log

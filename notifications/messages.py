@@ -144,3 +144,66 @@ def build(
             else None
         ),
     }
+
+
+IMPACT_WORDS = {
+    "none": "Informational",
+    "minor": "Minor impact",
+    "major": "Major impact",
+    "critical": "Critical impact",
+}
+
+
+def build_provider(event: str, incident, *, now: datetime | None = None) -> dict[str, Any]:
+    """The alert for a third-party provider's incident (dependency monitoring). Shaped like a
+    monitor's alert, so every channel can send it unchanged."""
+    now = now or timezone.now()
+    provider = incident.provider
+    end = incident.ended_at or now
+    duration = max(0, round((end - incident.started_at).total_seconds()))
+    latest = incident.updates[0]["body"] if incident.updates else ""
+    if event == "resolved":
+        title, severity = f"{provider.name}: {incident.title} (resolved)", "up"
+        summary = f"{provider.name} reports it resolved after {humanize_duration(duration)}."
+    else:
+        title = f"{provider.name}: {incident.title}"
+        severity = "down" if incident.impact in ("major", "critical") else "warning"
+        stage = incident.get_stage_display()
+        summary = f"{IMPACT_WORDS.get(incident.impact, 'Impact unknown')} · {stage}."
+        if latest:
+            summary += f" {latest[:240]}{'…' if len(latest) > 240 else ''}"
+    link = incident.url or provider.status_page_url
+    return {
+        "kind": "provider",
+        "event": event,
+        "severity": severity,
+        "title": title,
+        "summary": summary,
+        "url": link,
+        "created_at": now.isoformat(),
+        # Channels read these two; for a provider they describe the provider and its incident.
+        "monitor": {
+            "id": str(provider.slug),
+            "name": provider.name,
+            "type": "provider",
+            "target": provider.status_page_url,
+        },
+        "incident": {
+            "id": str(incident.id),
+            "started_at": incident.started_at.isoformat(),
+            "ended_at": incident.ended_at.isoformat() if incident.ended_at else None,
+            "duration_seconds": duration,
+            "reason": "provider_incident",
+            "reason_label": incident.title,
+            "status_code": None,
+            "impact": incident.impact,
+            "stage": incident.stage,
+        },
+        "provider": {
+            "slug": provider.slug,
+            "name": provider.name,
+            "status_page_url": provider.status_page_url,
+            "impact": incident.impact,
+            "affected": incident.affected,
+        },
+    }

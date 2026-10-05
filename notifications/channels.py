@@ -34,8 +34,18 @@ except ImportError:  # pragma: no cover
     webpush = None
     WebPushException = Exception
 
-COLORS = {"down": "#dc2626", "up": "#16a34a", "test": "#6c5ce7"}
-DISCORD_COLORS = {"down": 0xDC2626, "up": 0x16A34A, "test": 0x6C5CE7}
+COLORS = {"down": "#dc2626", "warning": "#f59e0b", "up": "#16a34a", "test": "#6c5ce7"}
+DISCORD_COLORS = {"down": 0xDC2626, "warning": 0xF59E0B, "up": 0x16A34A, "test": 0x6C5CE7}
+
+
+def event_name(payload: dict) -> str:
+    """The event as a webhook receiver sees it: `incident.opened` for a monitor's incident,
+    `provider_incident.opened` for a third-party provider's."""
+    if payload.get("kind") == "provider":
+        return f"provider_incident.{payload['event']}"
+    return EVENT_NAMES[payload["event"]]
+
+
 EVENT_NAMES = {
     "opened": "incident.opened",
     "reminder": "incident.reminder",
@@ -165,20 +175,22 @@ class WebhookChannel(Channel):
         body = json.dumps(
             {
                 "id": delivery_id,
-                "event": EVENT_NAMES[payload["event"]],
+                "event": event_name(payload),
                 "created_at": payload["created_at"],
                 "title": payload["title"],
                 "summary": payload["summary"],
                 "url": payload["url"],
                 "monitor": payload["monitor"],
                 "incident": payload["incident"],
+                # For alerts about a third-party provider, so a receiver can tell them apart.
+                **({"provider": payload["provider"]} if payload.get("kind") == "provider" else {}),
             },
             separators=(",", ":"),
         ).encode()
         headers = {
             "Content-Type": "application/json",
             "User-Agent": "RootPulse-Webhook/1.0",
-            "X-RootPulse-Event": EVENT_NAMES[payload["event"]],
+            "X-RootPulse-Event": event_name(payload),
             "X-RootPulse-Delivery": str(delivery_id),
             # The same scheme the API uses internally: HMAC-SHA256 over "<t>." + body.
             signing.HEADER: signing.sign(config["secret"], body),
