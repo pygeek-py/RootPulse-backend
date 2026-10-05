@@ -282,3 +282,20 @@ Deviation from the plan sketch: unsubscribing is a POST (with a GET that only de
 **Not built (stretch goal in the plan):** custom domains. The page lives at `/s/{slug}` on the frontend.
 
 Tests: 129 in `tests/test_status_pages.py`, covering ownership on every route, slug/branding/password validation, the access rules (unpublished vs missing, locked pages leak nothing, tokens are per page and die with the password, expiry, throttles), what the public payload contains and omits, a fixed number of queries however large the page, the comment-visibility toggle appearing and disappearing on the page through the real incident API, the double opt-in flow, and the email queue (fan-out, recovery rules, retries, permanent failures, header injection).
+
+## Reports and export (Phase 13)
+
+Files you can download, built on the spot from the same data the dashboards read, so a report for the last 30 days agrees with the analytics page for the last 30 days (a test asserts the equality, and so does a check against the real dev database). All under `/api/v1/reports/`, signed in, scoped to you, 20 requests a minute.
+
+| Request | What you get |
+| --- | --- |
+| `GET /reports/uptime.pdf?start_date=&end_date=[&monitor_id=]` | A PDF: the period, a summary (uptime, checks, average response, incidents, total downtime, longest incident, average time to recover), a table per monitor, and every incident that started in the period. |
+| `GET /reports/uptime.csv?...` | The per-monitor table as CSV, plus an "All monitors" total row. |
+| `GET /reports/incidents.csv` | The incidents export (the same filters and columns as `GET /incidents/export/`), so every download lives under `/reports/`. |
+| `GET /reports/status-page/{id}.pdf` | A snapshot of one of your status pages: overall status, each service with status and 90-day uptime, announcements, and the last 14 days of outages with the notes visitors can see. Works for a draft or a password-protected page (you own it); built from the same function as the public page, so it can't show anything the public page wouldn't. |
+
+**The period.** Both dates are required, inclusive, at most 366 days, not in the future. Days are **UTC days** (that is what the daily rollups are made of); the PDF says so. Checks and uptime come from `CheckRollupDaily`; downtime, incident counts, longest incident and time to recover come from incidents clipped to the period (an incident that began before it counts only the time inside, and is counted under the day it began). Incidents marked *excluded from reports* are left out of every figure and from the list, and the report says how many were left out. A monitor with no checks and no incidents in the period isn't listed as a row of zeros.
+
+**Files.** The PDF is made with ReportLab (pure Python, no browser or system libraries, which is what makes it behave the same on a laptop and in the Render container; check it once in the deployed container, as the roadmap advises). Everything from your account is shown as text, never interpreted as markup, and characters the built-in PDF font can't draw (for example CJK) appear as `?` rather than as boxes. Times are in your time zone. Lists are capped at the most recent 500 incidents, and the PDF says when it was cut. CSV cells that start with `=`, `+`, `-` or `@` are prefixed with `'` so a spreadsheet won't run them as formulas. Responses are `Cache-Control: no-store`.
+
+Tests: 57 in `tests/test_reports.py`. The CSV is parsed back with `csv` and the PDF with `pypdf`, and both are compared with numbers worked out by hand (checks, failures, uptime, an incident across midnight, an ongoing one, excluded ones), with the fleet analytics for the same period, and with the incident export. They also cover range validation, other users' data never appearing, the status page PDF showing nothing a visitor couldn't see, markup and non-Latin names, time zones, a 520-incident report running over pages, and the rate limit.

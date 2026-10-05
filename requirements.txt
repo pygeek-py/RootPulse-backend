@@ -10,11 +10,13 @@ python-dotenv
 httpx
 dnspython
 pywebpush
+reportlab
 gunicorn
 
 # Testing
 pytest
 pytest-django
+pypdf
 factory_boy
 
 # Lint / format

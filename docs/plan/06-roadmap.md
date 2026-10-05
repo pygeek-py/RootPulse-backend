@@ -268,6 +268,8 @@
 
 **Checkpoint:** export a real month of incident data and confirm the numbers match the dashboard.
 
+> **Status: built.** See the Reports section of the README. The checkpoint is a test (a report and the fleet analytics agree for the same period) and was also checked against the real dev database. The remaining step the roadmap asks for, trying the PDF in the actual Render container, needs the deployment; ReportLab is pure Python so no system packages should be needed.
+
 ---
 
 ### Phase 14 — Onboarding & Polish

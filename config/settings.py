@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "deploys",
     "providers",
     "statuspages",
+    "reports",
 ]
 
 MIDDLEWARE = [
@@ -203,6 +204,7 @@ REST_FRAMEWORK = {
         "public_status": "120/min",  # a page open in a few tabs refreshes about once a minute
         "public_unlock": "10/min",  # password guesses
         "public_subscribe": "10/hour",  # each one can send an email to a stranger
+        "reports": "20/min",  # each one reads a lot of rows and builds a file
         "public_token": "30/min",  # confirm / unsubscribe links
     },
     "EXCEPTION_HANDLER": "config.exceptions.api_exception_handler",
