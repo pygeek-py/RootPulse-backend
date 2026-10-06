@@ -269,7 +269,7 @@ def check(env: Mapping[str, str], *, proxied: bool = False) -> list[Finding]:
         if port == "587" and not _truthy(env.get("EMAIL_USE_SSL"), False):
             warn(
                 "EMAIL_PORT",
-                "587 is blocked on Render's free tier; Resend also listens on 2587 or 2465",
+                "587 (and 25, 465) are blocked on Render's free tier; Brevo also listens on 2525",
             )
         if not get("EMAIL_HOST_USER") or not get("EMAIL_HOST_PASSWORD"):
             fail("EMAIL_HOST_PASSWORD", "or EMAIL_HOST_USER is missing")

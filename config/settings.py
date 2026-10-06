@@ -295,7 +295,7 @@ GITHUB_OAUTH_REDIRECT_URI = os.environ.get(
     "GITHUB_OAUTH_REDIRECT_URI", "http://localhost:8000/api/v1/auth/github/callback/"
 )
 
-# Sign-in emails go over SMTP whenever EMAIL_HOST is set (Gmail, Resend, Brevo…
+# Sign-in emails go over SMTP whenever EMAIL_HOST is set (Gmail, Brevo, …
 # all work), and print to the server console otherwise. EMAIL_BACKEND overrides.
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))

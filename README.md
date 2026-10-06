@@ -36,7 +36,7 @@ Endpoints under `/api/v1/auth/`: `register/`, `login/` (each emails a link + 6-d
 - Access JWT (15 min) is returned in the body; refresh JWT (30 days) is an httpOnly cookie scoped to `/api/v1/auth/`, rotated and blacklisted on every use. In production it is `SameSite=None; Secure` (Vercel and Render are different sites), so cookie-authenticated endpoints also check the `Origin` header against `CORS_ALLOWED_ORIGINS` as CSRF defence.
 - **Passwordless.** There are no user passwords. `register/` and `login/` always answer 204 (no account enumeration) and email a single-use link plus a 6-digit code; either one signs in, and the account is created on first successful verify. Challenges expire after 15 minutes, are stored only as hashes, are superseded by the newest email, allow one email per address per minute, and the code is locked after 5 wrong guesses. The link carries its token in the URL fragment and is redeemed by `POST verify/`, so mail scanners can't consume it. Per-IP rate limits honour `NUM_PROXIES`.
 - GitHub OAuth only trusts verified emails and uses a `state` cookie against login-CSRF. Leave `GITHUB_OAUTH_CLIENT_ID` blank to disable it.
-- Sign-in emails go over SMTP when `EMAIL_HOST` is set (see `.env.example` for Gmail and Resend settings) and print in the server console otherwise. Check delivery with `python manage.py sendtestemail you@example.com`. Expired challenge rows are not yet purged; a cleanup job is added with the Phase 6 scheduler.
+- Sign-in emails go over SMTP when `EMAIL_HOST` is set (see `.env.example` for Gmail and Brevo settings) and print in the server console otherwise. Check delivery with `python manage.py sendtestemail you@example.com`. Expired challenge rows are not yet purged; a cleanup job is added with the Phase 6 scheduler.
 - Tests: `python -m pytest` (66 tests; sqlite in-memory, or `TEST_DATABASE=postgres` as CI does).
 
 ## Notes on this environment's setup
@@ -58,7 +58,7 @@ Per this session's own safety rules, I don't create accounts on third-party serv
 | **Render** | API hosting | Create a free account, connect the `RootPulse-backend` repo (or give me an API key) — `render.yaml` + `Dockerfile` are ready |
 | **Cloudflare** | Worker probers (Phase 6) | Create a free account for Workers |
 | **Vercel** | Frontend hosting | Create a free account, connect the `RootPulse-frontend` repo |
-| **Resend** (or any SMTP) | Alert and sign-in email in production | Create a free account; put the SMTP settings in the host's environment. Locally the `.env` SMTP settings already send real mail |
+| **Brevo** (or any SMTP) | Alert and sign-in email in production | Create a free account, verify one sender address (no domain needed); put the SMTP settings in the host's environment. Locally the `.env` SMTP settings already send real mail |
 | **Telegram bot** | One-click Telegram (Phase 8) | Create one bot with @BotFather; set `TELEGRAM_BOT_TOKEN` (the rest is automatic) |
 | **Discord app** | One-click Discord | Create one application at discord.com/developers; set `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` and the redirect URL |
 | **Slack app** | One-click Slack | Create one app at api.slack.com/apps; set `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` and the redirect URL (https only) |

@@ -223,3 +223,8 @@ def test_the_cron_workflows_stay_quiet_until_their_secrets_exist(name):
     assert "exit 0" in run[skip : skip + 100]
     assert '[ -z "${API_URL:-}" ] && [ -z "${SCHEDULER_SHARED_SECRET:-}" ]' in run
     assert "must both be set" in run
+
+
+def test_the_blueprint_does_not_use_an_smtp_port_render_blocks_on_the_free_tier():
+    port = int(blueprint_vars()["EMAIL_PORT"]["value"])
+    assert port not in {25, 465, 587}, "Render's free tier blocks outbound SMTP on this port"

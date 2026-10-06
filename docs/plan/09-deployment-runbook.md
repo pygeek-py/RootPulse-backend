@@ -8,7 +8,7 @@ Read with `01-tech-stack.md` (why these hosts), `07-security-review.md` and `08-
 
 | Done in the repository (and tested) | Only you can do |
 | --- | --- |
-| A production image that migrates on start, runs as a normal user, serves its own static files and has a hardened `gunicorn` | Make the accounts: Neon, Render, Vercel, Cloudflare, Resend, GitHub OAuth app, and the Telegram / Discord / Slack apps |
+| A production image that migrates on start, runs as a normal user, serves its own static files and has a hardened `gunicorn` | Make the accounts: Neon, Render, Vercel, Cloudflare, Brevo, GitHub OAuth app, and the Telegram / Discord / Slack apps |
 | `render.yaml`: every setting the API reads, with the secrets left for you to fill in | Fill the secrets in (Render dashboard, Vercel, GitHub, `wrangler secret put`) |
 | `scripts/preflight.py`: checks your production settings for mistakes before you deploy, printing no values | Push the repositories to GitHub (nothing has been pushed yet) |
 | `scripts/smoke_test.py`: checks a live deployment, and the CI job that runs it against the real container | A custom domain, if you want one (it is the one thing here that costs money; see "Addresses") |
@@ -32,7 +32,7 @@ Read with `01-tech-stack.md` (why these hosts), `07-security-review.md` and `08-
 
 ## Accounts you need (all free)
 
-GitHub (you have it), [Neon](https://neon.tech), [Render](https://render.com), [Vercel](https://vercel.com), [Cloudflare](https://cloudflare.com), [Resend](https://resend.com) (email; needs a domain you control to send to anyone but yourself, so for a first run use your own address as the recipient). Optional: Sentry (error tracking), UptimeRobot or similar (the external "who watches the watcher" check), and the apps for Telegram, Discord and Slack.
+GitHub (you have it), [Neon](https://neon.tech), [Render](https://render.com), [Vercel](https://vercel.com), [Cloudflare](https://cloudflare.com), [Brevo](https://www.brevo.com) (email; the free plan sends 300 a day to anyone once one sender address is verified, no domain needed). Optional: Sentry (error tracking), UptimeRobot or similar (the external "who watches the watcher" check), and the apps for Telegram, Discord and Slack.
 
 ## Order of steps
 
@@ -107,7 +107,7 @@ Discord, Slack and GitHub sign-in need apps registered with the production addre
 - **Discord.** In the Discord developer portal add the redirect `<API_PUBLIC_URL>/api/v1/integrations/discord/callback/` and set `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`. (`API_PUBLIC_URL` stays the API's own address; the callback is a browser round trip that the API answers directly.)
 - **Slack.** At api.slack.com/apps create an app, turn on Incoming Webhooks, add the https redirect `<API_PUBLIC_URL>/api/v1/integrations/slack/callback/`, and set `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET`. To let people outside your own workspace install it, turn on public distribution.
 - **Web push.** The new `VAPID_*` values from step 3 (subscriptions made with the development keys won't work against new ones).
-- **Email.** Resend's SMTP on port **2587** (Render's free tier blocks port 587; Gmail's 587 is blocked the same way). `DEFAULT_FROM_EMAIL` must be on a domain verified with Resend.
+- **Email (Brevo).** Render's free tier blocks outbound SMTP on ports 25, 465 and 587 (Gmail's SMTP only offers 465 and 587, so it can't be used), but Brevo also listens on **2525**. In Brevo: create the free account, add and verify one **sender** (type your address, then enter the 6-digit code it emails you; no domain needed), then open SMTP & API, SMTP tab, and create an SMTP key. On Render set `EMAIL_HOST=smtp-relay.brevo.com` and `EMAIL_PORT=2525` (already in the blueprint), `EMAIL_HOST_USER` to the **SMTP login shown on that tab** (it is not your account email), `EMAIL_HOST_PASSWORD` to the SMTP key, and `DEFAULT_FROM_EMAIL` to `RootPulse <your verified sender>`. Known snags: with a `@gmail.com` sender Brevo has no DKIM for that domain and rewrites the sender domain to `brevosend.com`, so some codes may land in spam (a verified domain fixes it later); some new Brevo accounts must have SMTP activated by Brevo's support ("SMTP Account Not Activated"); and I could not confirm from outside Render that port 2525 is open, so the first real sign-in on the deployed site is the test (a connection timeout in Render's log means it is blocked).
 - **GitHub sign-in.** A GitHub OAuth app whose callback is `https://<site>/api/v1/auth/github/callback/` (the **website's** address, so the sign-in cookie is set there), and the three `GITHUB_OAUTH_*` values with `GITHUB_OAUTH_REDIRECT_URI` set to that same callback. Discord and Slack use a signed token rather than a cookie, so their callbacks stay on the API's own address (`API_PUBLIC_URL`).
 
 Then, for each channel, add it under Settings, Notifications, and press **Send test**. A channel that has never delivered a real message is not a working channel.
@@ -153,7 +153,7 @@ Finally, the definition of done: stop the thing you monitor (or monitor a URL yo
 | GitHub Actions | **private repos: 2,000 minutes/month; public repos: unlimited.** Cron minimum 5 minutes, delays under load, disabled after 60 days idle | The scheduler runs 288 times a day and every run is billed as at least a minute (about 8,600 minutes a month), so on a private repository the free minutes are gone in about a week. The repository that holds the scheduler workflow must be **public** (or hold only that workflow, in a separate small public repository). Keep the repository active |
 | Vercel Hobby | personal, non-commercial use; request and bandwidth limits | Fine for a personal tool; API calls pass through it (the proxy) |
 | Cloudflare Workers free | 100,000 requests/day | Probers are only called for a failing monitor; ample |
-| Resend free | small daily/monthly email caps | Sign-in codes and subscriber mail only |
+| Brevo free | 300 emails a day | Sign-in codes and status-page subscriber mail share it |
 
 ## After go-live
 

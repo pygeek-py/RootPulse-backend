@@ -58,17 +58,18 @@ services:
       - key: PRIMARY_REGION
         value: render
       # --- Email (sign-in codes, status page subscribers) -----------------------------------
-      # Render's free tier blocks outbound SMTP on port 587; Resend accepts 2587 (or 2465).
+      # Render's free tier blocks outbound SMTP on ports 25, 465 and 587. Brevo (free, 300 a day,
+      # sends to anyone once ONE sender address is verified, no domain needed) also listens on 2525.
       - key: EMAIL_HOST
-        value: smtp.resend.com
+        value: smtp-relay.brevo.com
       - key: EMAIL_PORT
-        value: "2587"
+        value: "2525"
       - key: EMAIL_HOST_USER
-        value: resend
+        sync: false # your Brevo SMTP login (Brevo, SMTP & API, SMTP tab); not necessarily your email
       - key: EMAIL_HOST_PASSWORD
-        sync: false # the Resend API key
+        sync: false # a Brevo SMTP key (the same tab; not your account password)
       - key: DEFAULT_FROM_EMAIL
-        sync: false # RootPulse <login@yourdomain.com>, on a domain verified in Resend
+        sync: false # RootPulse <your-verified-sender@example.com>: the sender address you verified in Brevo
       # --- Sign-in with GitHub --------------------------------------------------------------
       - key: GITHUB_OAUTH_CLIENT_ID
         sync: false
