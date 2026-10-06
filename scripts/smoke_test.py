@@ -157,6 +157,18 @@ class Smoke:
         ), "a stranger's origin is allowed by CORS"
         return "the website is allowed; a stranger is not"
 
+    def check_debug_is_off(self) -> str:
+        """Django's debug mode answers an unknown address with a page that lists every URL
+        pattern (the admin's secret address included) and settings. A missing DJANGO_DEBUG=false
+        is the easiest way to get it, and a manually created Render service starts that way."""
+        response = self.request("GET", "/smoke-test-no-such-page/")
+        assert "DEBUG = True" not in response.text and "URLconf" not in response.text, (
+            "DEBUG is ON in production: set DJANGO_DEBUG=false (and check every other value "
+            "in render.yaml reached the service) immediately"
+        )
+        assert response.status_code == 404, f"an unknown address answered {response.status_code}"
+        return "debug mode is off"
+
     def check_admin_is_hidden(self) -> str:
         response = self.request("GET", "/admin/")
         assert (
@@ -256,6 +268,7 @@ class Smoke:
                 self.check_anonymous_refused_with_headers,
             ),
             ("CORS admits the website only", self.check_cors),
+            ("Debug mode is off", self.check_debug_is_off),
             ("Admin is not at /admin/", self.check_admin_is_hidden),
             ("Static files are served", self.check_static_files),
             ("API schema", self.check_schema),

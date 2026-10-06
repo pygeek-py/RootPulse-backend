@@ -56,6 +56,12 @@ def deployment(**broken):
                     "access-control-allow-credentials": "true",
                 }
             return httpx.Response(200, headers=headers)
+        if path == "/smoke-test-no-such-page/":
+            if broken.get("debug"):
+                return httpx.Response(
+                    404, text="<p>DEBUG = True</p> Using the URLconf defined in x"
+                )
+            return httpx.Response(404, text="Not Found")
         if path == "/admin/":
             return httpx.Response(broken.get("admin", 404))
         if path == "/static/admin/css/base.css":
@@ -113,6 +119,7 @@ def test_a_correct_deployment_passes_every_check():
         ({"cors": "open"}, "CORS admits the website only"),
         ({"cors": "closed"}, "CORS admits the website only"),
         ({"admin": 200}, "Admin is not at /admin/"),
+        ({"debug": True}, "Debug mode is off"),
         ({"static": 404}, "Static files are served"),
         ({"status_page": 200}, "Unknown status page is a 404"),
         ({"trigger": "open"}, "Scheduler trigger is closed"),
