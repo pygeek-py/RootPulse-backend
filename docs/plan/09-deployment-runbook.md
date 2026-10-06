@@ -13,21 +13,21 @@ Read with `01-tech-stack.md` (why these hosts), `07-security-review.md` and `08-
 | `scripts/preflight.py`: checks your production settings for mistakes before you deploy, printing no values | Push the repositories to GitHub (nothing has been pushed yet) |
 | `scripts/smoke_test.py`: checks a live deployment, and the CI job that runs it against the real container | A custom domain, if you want one (it is the one thing here that costs money; see "Addresses") |
 | The scheduler's GitHub Actions workflows, and a time budget so one trigger can't overrun its caller | Deploy the Cloudflare Workers, register the Telegram webhook |
-| An optional proxy so the sign-in cookie works in every browser; an off-switch for new accounts | Run the smoke test against production, then create the first real monitor |
+| The website-proxies-the-API setup so the sign-in cookie works in every browser; an off-switch for new accounts | Run the smoke test against production, then create the first real monitor |
 
 ## Before anything: the four decisions
 
-1. **Addresses.** With no domain you get `https://<name>.vercel.app` (website) and `https://<name>.onrender.com` (API). Both are free and have HTTPS. A custom domain is optional and **not free**; if you add one, put the website at `app.<domain>` and the API at `api.<domain>` (same registrable domain, so the cookie stays first-party).
-2. **Cookies** (the one real design choice). The sign-in cookie is set by the API. On two unrelated hosts (`*.vercel.app` and `*.onrender.com`) it is a third-party cookie, which Safari and some privacy browsers refuse: those people would be signed out on every reload.
+1. **Addresses (decided: no custom domain yet).** The website is `https://<project>.vercel.app` and the API is `https://<service>.onrender.com`. Both are free and have HTTPS. A custom domain is optional, **not free**, and can be added later without code changes (Vercel and Render both take a domain in their dashboards; then update `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS` and the OAuth callbacks).
+2. **Cookies (decided: the website proxies the API).** The sign-in cookie is set by the API. On two unrelated hosts it would be a third-party cookie, which Safari and some privacy browsers refuse (people would be signed out on every reload). So the browser only ever talks to the website, and the website forwards `/api/v1/*` to the API: the cookie is first-party and works everywhere, at no cost.
 
-   | Option | Cost | Works in Safari? | Set |
-   | --- | --- | --- | --- |
-   | **A. Website proxies the API** (recommended with no domain) | none | yes | Vercel: `NEXT_PUBLIC_API_URL=` (empty), `API_PROXY_TARGET=https://<api>`, `NEXT_PUBLIC_SITE_URL=https://<site>`. Render: `AUTH_REFRESH_COOKIE_SAMESITE=Lax`, `NUM_PROXIES=2`, GitHub callback on the **website's** address. Run preflight with `--proxied` |
-   | **B. One domain, two subdomains** | a domain | yes | `app.` and `api.` under it; `AUTH_REFRESH_COOKIE_SAMESITE=Lax` |
-   | **C. Two unrelated hosts** | none | **no** | the default (`None`); fine for trying it out, not for daily use |
+   | Where | Setting |
+   | --- | --- |
+   | Vercel | `NEXT_PUBLIC_API_URL` = empty, `API_PROXY_TARGET=https://<service>.onrender.com`, `NEXT_PUBLIC_SITE_URL=https://<project>.vercel.app` |
+   | Render (already the default in `render.yaml`) | `AUTH_REFRESH_COOKIE_SAMESITE=Lax`, `NUM_PROXIES=2`; the GitHub sign-in callback is on the **website's** address |
+   | Preflight | run with `--proxied` |
 
-   Option A was exercised against the running stack (the API answered through the website's port, with query strings, the `Origin` header and the cookie path intact). Two things it cannot show from here: that Vercel forwards `x-forwarded-for` so `NUM_PROXIES=2` sees real visitor addresses (after deploying, sign in from two networks and watch the `X-RateLimit-*` headers differ), and Vercel's own request limits.
-3. **Staging or straight to production.** Render's free instance has 750 free hours a month, which is exactly one service running all month. A second always-on staging service would use the same pool, so staging can't run alongside production 24/7. Either deploy staging for a few days **before** production and then delete it, or skip it and treat the first days of production as the soak (the roadmap's preference is a real staging first). Staging must use its **own** Neon project, its own secrets, and its own Telegram bot; never reuse production's.
+   Exercised locally against the running stack (the API answered through the website's port, with query strings, the `Origin` header and the cookie path intact). Two things only a deployment can show: that Vercel forwards `x-forwarded-for` so `NUM_PROXIES=2` sees real visitor addresses (sign in from two networks and watch the `X-RateLimit-*` headers differ), and Vercel's own request limits. `NEXT_PUBLIC_*` and `API_PROXY_TARGET` are read at **build** time: change one, redeploy the website.
+3. **Staging or straight to production.** Render's free instance has 750 free hours a month, which is exactly one service running all month. A second always-on staging service would use the same pool, so staging can't run alongside production 24/7. Either deploy staging for a few days **before** production and then delete it, or skip it and treat the first days of production as the soak (the roadmap's preference is a real staging first). Staging must use its **own** Neon project and its own secrets; never reuse production's.
 4. **Who can sign up.** Sign-up is open until you close it (`SIGNUPS_OPEN`). Create your own account first, then set `SIGNUPS_OPEN=false`.
 
 ## Accounts you need (all free)
@@ -61,11 +61,11 @@ Render's blueprint generates the secret key, scheduler secret, prober secret and
 ### 4. The API (Render)
 
 1. New, Blueprint, pick the backend repository. Render reads `render.yaml`.
-2. Fill the `sync: false` values (the file's comments say what each is). The minimum to boot: `DATABASE_URL`, `DJANGO_ALLOWED_HOSTS` (or rely on Render's own name), `DJANGO_ADMIN_URL`, `API_PUBLIC_URL`, `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS`.
+2. Fill the `sync: false` values (the file's comments say what each is). The minimum to boot: `DATABASE_URL`, `DJANGO_ADMIN_URL`, `API_PUBLIC_URL` (= the service's own `https://<service>.onrender.com`), and `FRONTEND_URL` / `CORS_ALLOWED_ORIGINS` (= the website's address). You don't know the website's address until step 5, so put your intended `https://<project>.vercel.app` now (Vercel shows whether the name is free when you create the project) and correct it afterwards if needed. `DJANGO_ALLOWED_HOSTS` can hold just the `*.onrender.com` name.
 3. Before the first deploy, check your values on your own machine. Put them in a file named like `prod.env` (git ignores every `*.env` file) or, better, outside the repository, and never commit it:
 
    ```bash
-   python scripts/preflight.py --env-file prod.env            # add --proxied for option A
+   python scripts/preflight.py --env-file prod.env --proxied
    ```
 
    It prints the *names* of what is wrong and never a value. Fix every `FAIL`; read every `WARN`.
@@ -75,7 +75,7 @@ Check: Render's log ends with gunicorn listening, and `https://<api>/health/` an
 
 ### 5. The website (Vercel)
 
-Import the frontend repository. Environment variables: `NEXT_PUBLIC_API_URL` (the API's address, or empty for option A with `API_PROXY_TARGET` and `NEXT_PUBLIC_SITE_URL`), optionally `NEXT_PUBLIC_STATUS_PAGE_URL`. Deploy. Check: the landing page loads and its response carries a `Content-Security-Policy` header. Update `FRONTEND_URL` and `CORS_ALLOWED_ORIGINS` on Render to the real address if they were placeholders, and redeploy the API.
+Import the frontend repository. Environment variables (add them **before** the first deploy; they are build-time): `NEXT_PUBLIC_API_URL` empty, `API_PROXY_TARGET` (the API's address from step 4), `NEXT_PUBLIC_SITE_URL` (this site's address), and optionally `NEXT_PUBLIC_STATUS_PAGE_URL`. Deploy. Check: the landing page loads; `https://<site>/api/v1/schema/` returns the API's OpenAPI document (that is the proxy working); and the page's response carries a `Content-Security-Policy` header. If the site's real address differs from what you put in `FRONTEND_URL` / `CORS_ALLOWED_ORIGINS` on Render, correct them there and let Render redeploy.
 
 ### 6. Your account
 
@@ -93,20 +93,20 @@ Follow `workers/prober/README.md` ("Deploying"): `npx wrangler login`, deploy a 
 
 ### 9. Alert channels (do this before you rely on RootPulse for anything real)
 
-Use **production** apps, not the development ones:
+Discord, Slack and GitHub sign-in need apps registered with the production addresses (Telegram is the exception, above):
 
-- **Telegram.** Make a *separate* bot with @BotFather. On Render set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` and `TELEGRAM_WEBHOOK_SECRET` (a long random value; the blueprint generates one) and make sure `API_PUBLIC_URL` is the https address. Then, **once**, from your own machine with the production values in your environment (Render's free tier has no shell):
+- **Telegram.** You are reusing your existing bot (the same token as in development), which is fine for one owner, with these consequences: (1) a bot has either a webhook or polling, never both, so once you register the production webhook the bot stops delivering "Start" presses to your local machine (local polling just gets a refusal; to develop against it locally again, run `python manage.py telegram_webhook delete`); (2) chats you connected in development live in the *development* database, so reconnect them in production (Settings, Notifications, Connect Telegram); (3) the token is a credential for that bot: if it ever leaks, revoke it in @BotFather (`/revoke`) and update both places. On Render set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_USERNAME` (copy them from your own `.env`) and make sure `API_PUBLIC_URL` is the https address; the blueprint generates `TELEGRAM_WEBHOOK_SECRET`. Then, **once**, from your own machine with the *production* values in your environment (Render's free tier has no shell):
 
   ```bash
   python manage.py telegram_webhook set
   python manage.py telegram_webhook info      # confirms Telegram can reach the API
   ```
 
-- **Discord.** In the Discord developer portal add the redirect `<API_PUBLIC_URL>/api/v1/integrations/discord/callback/` and set `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`. (Under option A, `API_PUBLIC_URL` stays the API's own address; the callback is a browser round trip that the API answers directly.)
+- **Discord.** In the Discord developer portal add the redirect `<API_PUBLIC_URL>/api/v1/integrations/discord/callback/` and set `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`. (`API_PUBLIC_URL` stays the API's own address; the callback is a browser round trip that the API answers directly.)
 - **Slack.** At api.slack.com/apps create an app, turn on Incoming Webhooks, add the https redirect `<API_PUBLIC_URL>/api/v1/integrations/slack/callback/`, and set `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET`. To let people outside your own workspace install it, turn on public distribution.
 - **Web push.** The new `VAPID_*` values from step 3 (subscriptions made with the development keys won't work against new ones).
 - **Email.** Resend's SMTP on port **2587** (Render's free tier blocks port 587; Gmail's 587 is blocked the same way). `DEFAULT_FROM_EMAIL` must be on a domain verified with Resend.
-- **GitHub sign-in.** A GitHub OAuth app whose callback is `<address>/api/v1/auth/github/callback/` (the website's address under option A, the API's otherwise), and the three `GITHUB_OAUTH_*` values.
+- **GitHub sign-in.** A GitHub OAuth app whose callback is `https://<site>/api/v1/auth/github/callback/` (the **website's** address, so the sign-in cookie is set there), and the three `GITHUB_OAUTH_*` values with `GITHUB_OAUTH_REDIRECT_URI` set to that same callback. Discord and Slack use a signed token rather than a cookie, so their callbacks stay on the API's own address (`API_PUBLIC_URL`).
 
 Then, for each channel, add it under Settings, Notifications, and press **Send test**. A channel that has never delivered a real message is not a working channel.
 
@@ -149,7 +149,7 @@ Finally, the definition of done: stop the thing you monitor (or monitor a URL yo
 | Render free web service | 750 h/month, sleeps after 15 min idle, ~512 MB RAM, no shell | One always-on service only; the 5-minute cron keeps it awake; use `manage.py` commands from your machine |
 | Neon free | 0.5 GB, limited connections, compute pauses when idle | Retention (90 days) and rollups keep data small; the cron keeps compute warm |
 | GitHub Actions | cron minimum 5 minutes, delays under load, disabled after 60 days idle | Checks can run a few minutes late; keep the repository active |
-| Vercel Hobby | personal, non-commercial use; request and bandwidth limits | Fine for a personal tool; under option A API calls pass through it |
+| Vercel Hobby | personal, non-commercial use; request and bandwidth limits | Fine for a personal tool; API calls pass through it (the proxy) |
 | Cloudflare Workers free | 100,000 requests/day | Probers are only called for a failing monitor; ample |
 | Resend free | small daily/monthly email caps | Sign-in codes and subscriber mail only |
 

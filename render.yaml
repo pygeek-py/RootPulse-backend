@@ -26,13 +26,13 @@ services:
       - key: DJANGO_SECRET_KEY
         generateValue: true # also signs sign-in tokens: rotating it signs everyone out
       - key: DJANGO_ALLOWED_HOSTS
-        sync: false # your API's host(s), comma separated, e.g. api.example.com (the *.onrender.com name is allowed automatically)
+        sync: false # your API's host(s), comma separated (the *.onrender.com name is allowed automatically, so this can hold just that)
       - key: DJANGO_ADMIN_URL
         sync: false # something unguessable, e.g. console-8f3k2/ (not "admin/")
       - key: DATABASE_URL
         sync: false # the PRODUCTION Neon connection string (a separate project from staging)
       - key: NUM_PROXIES
-        value: "1" # Render's load balancer. Use "2" when the website proxies the API (the runbook)
+        value: "2" # the website's proxy (Vercel), then Render's load balancer. Use "1" if the browser calls the API directly
       - key: SIGNUPS_OPEN
         value: "true" # create YOUR account, then change this to "false" (single-owner product)
       - key: LOG_LEVEL
@@ -47,7 +47,7 @@ services:
       - key: CORS_ALLOWED_ORIGINS
         sync: false # the website's origin, e.g. https://rootpulse.example.com (no wildcard)
       - key: AUTH_REFRESH_COOKIE_SAMESITE
-        value: "None" # use "Lax" when the website proxies the API (see the runbook, "Cookies")
+        value: "Lax" # the website proxies the API, so the cookie is first-party (runbook, "Cookies"). Use "None" only if the browser calls the API directly
       # --- Scheduler and probers -----------------------------------------------------------
       - key: SCHEDULER_SHARED_SECRET
         generateValue: true # copy into the GitHub Actions secret of the same name
@@ -75,7 +75,7 @@ services:
       - key: GITHUB_OAUTH_CLIENT_SECRET
         sync: false
       - key: GITHUB_OAUTH_REDIRECT_URI
-        sync: false # https://<api-host>/api/v1/auth/github/callback/
+        sync: false # the WEBSITE's address: https://<site>/api/v1/auth/github/callback/ (the sign-in cookie must be set on the website)
       # --- Web push -------------------------------------------------------------------------
       - key: VAPID_PRIVATE_KEY
         sync: false # python manage.py generate_vapid_keys (make NEW ones for production)
@@ -85,7 +85,7 @@ services:
         sync: false # mailto:you@yourdomain.com
       # --- One-click alert channels (each is optional) --------------------------------------
       - key: TELEGRAM_BOT_TOKEN
-        sync: false # a PRODUCTION bot from @BotFather, not the development one
+        sync: false # a bot from @BotFather (the same bot as in development works; see the runbook before sharing one)
       - key: TELEGRAM_BOT_USERNAME
         sync: false
       - key: TELEGRAM_WEBHOOK_SECRET

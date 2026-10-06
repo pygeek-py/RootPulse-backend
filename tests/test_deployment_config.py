@@ -56,7 +56,10 @@ def test_production_is_not_debug_and_has_a_generated_secret_key():
     env = blueprint_vars()
     assert env["DJANGO_DEBUG"]["value"] == "false"
     assert env["DJANGO_SECRET_KEY"].get("generateValue") is True
-    assert env["NUM_PROXIES"]["value"] == "1"
+    # The website (Vercel) proxies the API, then Render's balancer: two hops, and a first-party
+    # cookie. Both settings must change together, or sign-in or rate limits break.
+    assert env["NUM_PROXIES"]["value"] == "2"
+    assert env["AUTH_REFRESH_COOKIE_SAMESITE"]["value"] == "Lax"
 
 
 def test_every_variable_in_the_blueprint_is_one_the_code_reads():
