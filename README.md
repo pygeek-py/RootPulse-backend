@@ -349,3 +349,21 @@ A deliberate review of Phases 0 to 15; the full write-up, with every finding, th
 Run before every deploy: `pip-audit`, `python manage.py check --deploy`, the whole test suite.
 
 Tests: 30 in the gate, 43 in `tests/test_security_hardening.py` (one-line names, address spellings, provider redirects, mass assignment, forged tokens), plus the shared SSRF fixture run by both Python (147) and the Worker (26).
+
+## Testing and QA (Phase 17)
+
+The full write-up is `docs/plan/08-qa-report.md`; this is how to run each layer.
+
+```bash
+python -m pytest                                  # everything except the live tests (1,500+)
+python -m pytest --cov --cov-report=term-missing  # with branch coverage (96%); CI floor is 95%
+python -m pytest -m live tests/live               # the checks against the real internet (nightly in CI)
+(cd workers/prober && npm test)                   # the Worker, against the same SSRF fixtures
+pip-audit && python manage.py check --deploy      # dependencies and production settings
+```
+
+- **Live tests** (`tests/live/`): real DNS, TLS, HTTP and RDAP against stable public targets, the validator against public names that point at private addresses, and all 20 provider status feeds through the real adapters. Skipped, not failed, with no internet.
+- **End-to-end scenarios** (`scripts/qa_scenarios.py --api <url> --key <full key> [--read-key <read key>]`): the critical scenarios against a running RootPulse and real targets, through the public API only; it removes what it creates and attaches no alert contact. This is what to run against staging.
+- **Migrations can be undone** (`manage.py check_migrations_reversible`): migrate every app to zero and back on a scratch database (it refuses any other, since it drops every table); runs in the test suite on SQLite and in CI on Postgres.
+- **Scheduler load test** (`scripts/loadtest_scheduler.py --monitors 60`): one real pass at several pool sizes against a local server answering like a mix of real sites, on a scratch database. Result on 60 monitors over a 207 ms database link: 172.6 s with one worker, 37.8 s with the planned 20, 31.9 s with 40.
+- **CI** (`.github/workflows/ci.yml`): lint and format, migration drift, the whole suite with coverage on Python 3.12 and 3.14 against Postgres, the migration rollback on Postgres, `pip-audit`, `check --deploy`, the Worker's tests, and nightly the live tests.

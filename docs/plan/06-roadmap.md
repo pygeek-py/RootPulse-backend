@@ -348,6 +348,8 @@
 
 **Checkpoint:** a full CI run, clean, against a staging environment that has been exercised with real traffic for at least a few days.
 
+> **Status: code-side built; staging soak outstanding.** See `08-qa-report.md`. Done: coverage reviewed for gaps, the live tests against real services, the end-to-end scenarios against real targets (11 of 11), migration rollback on real Postgres, the scheduler load test, the route-map audit with accessibility checks, and a CI that has all of it. Outstanding because it needs the deployed system and time: a few days of staging with real traffic, a real alert on each channel, and the deployed probers.
+
 ---
 
 ### Phase 18 — Deployment to Production

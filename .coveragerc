@@ -1,0 +1,26 @@
+# scripts/ are run by hand against real services (docs/plan/08-qa-report.md), and the migration
+# check runs as a subprocess in tests/test_migrations.py, so neither is measured in-process.
+[run]
+branch = True
+source = .
+omit =
+    tests/*
+    */tests.py
+    */migrations/*
+    manage.py
+    config/wsgi.py
+    config/asgi.py
+    config/settings_test.py
+    .venv/*
+    workers/*
+    scripts/*
+    monitoring/management/commands/check_migrations_reversible.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    raise NotImplementedError
+    ^\s*\.\.\.$
+show_missing = True
+skip_covered = True

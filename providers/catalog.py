@@ -64,7 +64,14 @@ CATALOG: list[Entry] = [
 
 def sync_catalog(**_ignored) -> int:
     """Create or refresh the catalogue. Returns how many providers exist from it."""
+    from django.db import connection
+
     from .models import Provider
+
+    # `migrate providers zero` (rolling a bad migration back) fires this hook with the table
+    # already gone: nothing to sync then, and it mustn't turn a clean rollback into a crash.
+    if Provider._meta.db_table not in connection.introspection.table_names():
+        return 0
 
     for entry in CATALOG:
         Provider.objects.update_or_create(

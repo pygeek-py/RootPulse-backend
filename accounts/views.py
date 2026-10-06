@@ -5,6 +5,7 @@ from django.conf import settings
 from django.http import HttpResponseRedirect
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -13,8 +14,9 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from . import github, onboarding, passwordless
-from .models import EmailChallenge, User
+from .models import AuditLog, EmailChallenge, User
 from .serializers import (
+    AuditEntrySerializer,
     AuthResponseSerializer,
     EmailStartSerializer,
     OnboardingSerializer,
@@ -190,6 +192,26 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(UserSerializer(request.user).data)
+
+
+class AuditPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
+class AuditLogView(APIView):
+    """What has happened on the signed-in account (sign-ins, keys made or revoked, ...), newest
+    first. Only your own entries, read-only, so "was that me?" has an answer."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=["auth"], responses={200: AuditEntrySerializer(many=True)})
+    def get(self, request):
+        rows = AuditLog.objects.filter(user=request.user).order_by("-created_at")
+        paginator = AuditPagination()
+        page = paginator.paginate_queryset(rows, request, view=self)
+        return paginator.get_paginated_response(AuditEntrySerializer(page, many=True).data)
 
 
 class OnboardingView(APIView):

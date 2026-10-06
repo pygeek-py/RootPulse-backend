@@ -1,7 +1,10 @@
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings_test"
 python_files = ["test_*.py", "*_test.py", "tests.py"]
-addopts = "--reuse-db"
+addopts = "--reuse-db -m \"not live\""
+markers = [
+    "live: talks to the real internet (stable public targets); run with `pytest -m live tests/live`",
+]
 
 [tool.ruff]
 line-length = 100

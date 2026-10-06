@@ -4,9 +4,97 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "43 4 * * *" # nightly: new advisories, and the live tests against the real internet
+
+permissions:
+  contents: read
 
 jobs:
   lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is what the Docker image runs; 3.14 is what development uses.
+        python-version: ["3.12", "3.14"]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rootpulse
+          POSTGRES_USER: rootpulse
+          POSTGRES_PASSWORD: rootpulse
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rootpulse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DJANGO_SECRET_KEY: ci-only-secret
+      DB_NAME: rootpulse
+      DB_USER: rootpulse
+      DB_PASSWORD: rootpulse
+      DB_HOST: localhost
+      DB_PORT: 5432
+      TEST_DATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - run: ruff check .
+      - run: black --check .
+      - run: python manage.py check
+      - run: python manage.py makemigrations --check --dry-run
+      # Everything, with branch coverage. The threshold is a floor that catches a forgotten file,
+      # not a target: the report is read for gaps (docs/plan/08-qa-report.md).
+      - run: python -m pytest --cov --cov-report=term --cov-fail-under=95
+      # Every migration can be undone and redone, on real Postgres, in a scratch database.
+      - name: Migration rollback on Postgres
+        run: |
+          PGPASSWORD=rootpulse psql -h localhost -U rootpulse -d rootpulse -c 'CREATE DATABASE rootpulse_scratch'
+          DB_NAME=rootpulse_scratch python manage.py check_migrations_reversible
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - run: pip-audit
+      - run: python manage.py check --deploy --fail-level WARNING
+        env:
+          DJANGO_DEBUG: "false"
+          DJANGO_SECRET_KEY: "ci-0f5a1c7e9b3d4a6c8e2f1b0a9d8c7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d"
+          DJANGO_ALLOWED_HOSTS: api.example.com
+          DATABASE_URL: "sqlite:///:memory:"
+
+  prober-tests:
+    # The Cloudflare Worker prober shares its SSRF rules and signing format with the API;
+    # these tests run against the same fixtures (tests/fixtures) as the Python suite.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers/prober
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm test
+
+  live:
+    # The checks against real DNS, TLS, HTTP and RDAP, and every provider's real status feed.
+    # Nightly and on demand rather than on every push: it needs the internet and is slow.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -36,22 +124,4 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - run: pip install -r requirements.txt
-      - run: ruff check .
-      - run: black --check .
-      - run: python manage.py check
-      - run: python manage.py makemigrations --check --dry-run
-      - run: python -m pytest
-
-  prober-tests:
-    # The Cloudflare Worker prober shares its SSRF rules and signing format with the API;
-    # these tests run against the same fixtures (tests/fixtures) as the Python suite.
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: workers/prober
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-      - run: npm test
+      - run: python -m pytest -m live tests/live -v

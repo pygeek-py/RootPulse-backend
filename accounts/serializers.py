@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from rest_framework import serializers
 
 from . import onboarding
-from .models import User
+from .models import AuditLog, User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -86,3 +86,13 @@ class OnboardingSerializer(serializers.Serializer):
 
 class OnboardingUpdateSerializer(serializers.Serializer):
     dismissed = serializers.BooleanField()
+
+
+class AuditEntrySerializer(serializers.ModelSerializer):
+    """One thing that happened on the account. The stored metadata is deliberately not shown:
+    it is for forensics, and the action and where it came from answer "was this me?"."""
+
+    class Meta:
+        model = AuditLog
+        fields = ["id", "action", "ip_address", "created_at"]
+        read_only_fields = fields
