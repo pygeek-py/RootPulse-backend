@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "providers",
     "statuspages",
     "reports",
+    "apikeys",
 ]
 
 MIDDLEWARE = [
@@ -80,6 +81,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "apikeys.ratelimit.RateLimitHeadersMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -171,6 +173,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
+        # An API key (`Bearer rp_...`) is tried first; anything else is a dashboard JWT.
+        "apikeys.auth.ApiKeyAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
@@ -181,8 +185,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
     "DEFAULT_THROTTLE_CLASSES": (
-        "rest_framework.throttling.UserRateThrottle",
-        "rest_framework.throttling.AnonRateThrottle",
+        "apikeys.ratelimit.ReportingUserRateThrottle",
+        "apikeys.ratelimit.ReportingAnonRateThrottle",
     ),
     "DEFAULT_THROTTLE_RATES": {
         "user": "60/min",
@@ -204,6 +208,7 @@ REST_FRAMEWORK = {
         "public_status": "120/min",  # a page open in a few tabs refreshes about once a minute
         "public_unlock": "10/min",  # password guesses
         "public_subscribe": "10/hour",  # each one can send an email to a stranger
+        "api_key_manage": "20/hour",  # making and revoking keys
         "reports": "20/min",  # each one reads a lot of rows and builds a file
         "public_token": "30/min",  # confirm / unsubscribe links
     },
@@ -216,7 +221,7 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "RootPulse API",
-    "DESCRIPTION": "Uptime, incident & dependency monitoring — REST API v1.",
+    "DESCRIPTION": (BASE_DIR / "config" / "api_description.md").read_text(encoding="utf-8"),
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
@@ -325,6 +330,8 @@ NOTIFY_BACKOFF_SECONDS = (60, 300, 900, 900)  # after attempt 1, 2, 3, 4 (docs/p
 NOTIFY_WORKERS = int(os.environ.get("NOTIFY_WORKERS", "8"))
 NOTIFY_BATCH_SIZE = int(os.environ.get("NOTIFY_BATCH_SIZE", "100"))
 NOTIFY_HTTP_TIMEOUT = 10
+# Wrong API keys allowed per minute from one address before it is refused for a minute.
+API_KEY_FAILURES_PER_MINUTE = 20
 STATUS_PAGE_MAIL_WORKERS = int(os.environ.get("STATUS_PAGE_MAIL_WORKERS", "4"))
 STATUS_PAGE_MAIL_BATCH_SIZE = 50
 NOTIFY_MAX_REMINDERS = 24  # a long outage reminds at most this many times

@@ -317,3 +317,21 @@ A setup checklist on the dashboard that teaches what RootPulse is for as it sets
 Deviation from the roadmap's four steps: **dependencies** is the fifth, because knowing whether a problem is yours or a provider's is part of what RootPulse is for. Only two moments are remembered, as `User` fields: `onboarding_completed_at` (stamped the first time every step is done, once; later removing something reopens that step but doesn't un-finish it) and `onboarding_dismissed_at`. `PATCH` the same URL with `{"dismissed": true|false}` to hide the card or bring it back. Everything is per person, and signed-out callers get a 401.
 
 Tests: 21 in `tests/test_onboarding.py`: the steps in order, each ticking from the real thing (including alert-channel reachability and other people's data not counting), progress following the data in both directions, the completion stamp (once, surviving later changes), and dismiss/restore.
+
+## API keys and the developer surface (Phase 15)
+
+The API the dashboard uses is the API scripts use; keys are only a different way to sign in. No shadow "public API": a test fetches the same endpoints with a key and with a dashboard token and compares the JSON.
+
+**Keys.** `GET/POST /api/v1/api-keys/`, `DELETE /api-keys/{id}/` (the first DELETE revokes; deleting an already-revoked key removes it from the list). A key looks like `rp_` plus 43 random characters and is shown in the create response **once**; only its SHA-256 and a visible prefix (`rp_Ab3dE9fG`) are stored. Deviation from the plan, which says Argon2: a key is 256 random bits, so there is nothing to guess and nothing for a slow hash to protect, while it is checked on every request and has to be fast and indexable. A slow, salted hash would put roughly 50 ms of CPU on every API call and make lookup by hash impossible. Up to 10 active keys per account; making, revoking and removing are audit-logged without the key.
+
+**Using one.** `Authorization: Bearer rp_...` on any endpoint. It is tried before the dashboard's JWT (they can't be confused: a JWT doesn't start with `rp_`). A wrong, revoked or unknown key is a `401` with one message for every case, so it says nothing about which keys exist; a revoked key stops working on the next request (nothing is cached). The key's owner must still be active.
+
+**Scopes.** `read`: `GET`, `HEAD` and `OPTIONS` only; anything else is a `403 "This API key is read-only."`. `full`: everything except managing keys. The check lives in the authentication class, not in a permission class, so a view that sets its own `permission_classes` can't forget it. Key management itself needs a dashboard session (`SessionOnly`): even a full key can't list, make or revoke keys, so a leaked key can't dig in.
+
+**`last_used_at`** is for people reviewing their keys, so it is written at most once a minute per key (never on every request) and a refused request doesn't count.
+
+**Rate limits.** A key is its account for throttling: 60 requests a minute shared with the dashboard, so making a key doesn't raise anyone's allowance. Every throttled response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (seconds), and a `429` adds `Retry-After`. Wrong keys are refused before DRF's throttles run, so they have their own limit: 20 wrong keys a minute per address (`API_KEY_FAILURES_PER_MINUTE`), counted only for failures, so a good key never adds to it.
+
+**Reference.** The API serves its own reference, always in step with the code: Swagger UI at `/api/v1/docs/` and the OpenAPI schema at `/api/v1/schema/` (both public). The schema declares both sign-in schemes (`jwtAuth`, `apiKey`) and its description (`config/api_description.md`) covers authentication, scopes, rate limits, errors and pagination.
+
+Tests: 52 in `tests/test_api_keys.py`: the matrix from the security plan (valid works, revoked is rejected at once, a read key is rejected on a write), the key shown once and stored only as a hash, malformed headers, keys can't manage keys, ownership, `last_used_at`, rate-limit headers and limits, guessing throttled, and the published schema.

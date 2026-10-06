@@ -13,7 +13,7 @@ Every queryset in every DRF view is filtered by `request.user` — there is no c
 
 ## 3. API keys
 
-- Only a hash (Argon2) is stored; the raw key is shown exactly once, at creation.
+- Only a hash is stored; the raw key is shown exactly once, at creation. The hash is SHA-256, not Argon2: a key is 256 random bits, so a slow hash protects nothing, and it is checked on every request.
 - Two scopes: `read` (all `GET`s) and `full` (everything). No finer-grained scoping in MVP — matches the PRD's single-user, single-key-type design.
 - `last_used_at` updated async (not on the hot path) so a stale/compromised key is visible without slowing every request.
 - Revocation is immediate (checked on every request, not cached).

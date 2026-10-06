@@ -26,6 +26,7 @@ urlpatterns = [
     path("api/v1/", include("providers.urls")),
     path("api/v1/", include("statuspages.urls")),
     path("api/v1/", include("reports.urls")),
+    path("api/v1/", include("apikeys.urls")),
     path("api/v1/heartbeat/<str:token>/", HeartbeatView.as_view(), name="heartbeat"),
     path("internal/run-due-checks/", RunDueChecksView.as_view(), name="run-due-checks"),
     path("internal/run-rollups/", RunRollupsView.as_view(), name="run-rollups"),

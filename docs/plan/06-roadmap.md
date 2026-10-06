@@ -308,6 +308,8 @@
 
 **Checkpoint:** the same API a `curl` script uses is exactly the one the dashboard uses — no shadow "public API" reimplementation.
 
+> **Status: built.** See the API keys section of the README. The definition of done (a `curl` with a generated key lists monitors) was run against the local stack; the same call against production needs the deployment. Keys are hashed with SHA-256 rather than Argon2, for the reason given there.
+
 ---
 
 ### Phase 16 — Security Hardening
