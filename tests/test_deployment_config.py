@@ -195,6 +195,14 @@ def test_error_tracking_never_collects_personal_data_or_request_bodies():
     assert "traces_sample_rate=0" in block
 
 
+def test_request_urls_that_are_secrets_are_never_logged():
+    """Telegram puts the bot token in the URL and Slack/Discord webhook URLs are credentials;
+    httpx would log each at INFO."""
+    loggers = settings.LOGGING["loggers"]
+    for name in ("httpx", "httpcore"):
+        assert loggers[name]["level"] in ("WARNING", "ERROR", "CRITICAL")
+
+
 def test_error_tracking_stays_off_without_a_dsn():
     assert settings.SENTRY_DSN == ""
     assert "if SENTRY_DSN and not DEBUG" in read("config/settings.py")

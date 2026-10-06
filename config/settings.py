@@ -439,6 +439,10 @@ LOGGING = {
     "loggers": {
         # Gunicorn writes its own access log; Django's would only repeat it.
         "django.server": {"level": "WARNING"},
+        # httpx logs every request URL at INFO, and some URLs are secrets: Telegram's contains the
+        # bot token, and a Slack or Discord webhook URL is itself the credential.
+        "httpx": {"level": "WARNING"},
+        "httpcore": {"level": "WARNING"},
     },
 }
 
