@@ -236,3 +236,13 @@ def test_the_cron_workflows_stay_quiet_until_their_secrets_exist(name):
 def test_the_blueprint_does_not_use_an_smtp_port_render_blocks_on_the_free_tier():
     port = int(blueprint_vars()["EMAIL_PORT"]["value"])
     assert port not in {25, 465, 587}, "Render's free tier blocks outbound SMTP on this port"
+
+
+@pytest.mark.django_db
+def test_the_docs_page_loads_a_pinned_swagger_ui(client):
+    """The docs page pulls Swagger UI from a CDN and people paste API keys into it, so the
+    version must be pinned (never `@latest`)."""
+    html = client.get("/api/v1/docs/").content.decode()
+    assert "swagger-ui-dist@" in html
+    assert "@latest" not in html
+    assert re.search(r"swagger-ui-dist@\d+\.\d+\.\d+/", html)

@@ -235,6 +235,10 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": (BASE_DIR / "config" / "api_description.md").read_text(encoding="utf-8"),
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # The docs page loads Swagger UI from a CDN: pinned, so a new upstream release (or a hijacked
+    # one) can't change what runs on a page where people paste an API key.
+    "SWAGGER_UI_DIST": "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14",
+    "SWAGGER_UI_FAVICON_HREF": "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/favicon-32x32.png",
     "ENUM_NAME_OVERRIDES": {
         "StatusEnum": "monitoring.models.Monitor.Status",
         "TypeEnum": "monitoring.models.Monitor.Type",
