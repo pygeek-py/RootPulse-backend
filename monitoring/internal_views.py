@@ -4,6 +4,7 @@ heartbeat ping. Neither uses the user JWT; each has its own gate."""
 from __future__ import annotations
 
 import logging
+import time
 
 from django.conf import settings
 from django.utils import timezone
@@ -19,6 +20,9 @@ from .engine import run_scheduler_once
 from .models import Monitor
 
 logger = logging.getLogger(__name__)
+
+# Kept back from the trigger's time budget for sending alerts and subscriber mail.
+ALERT_RESERVE_SECONDS = 25
 
 
 class RunDueChecksView(APIView):
@@ -45,13 +49,20 @@ class RunDueChecksView(APIView):
         ):
             return Response({"detail": "Unauthorized."}, status=status.HTTP_401_UNAUTHORIZED)
 
+        began = time.monotonic()
         summary = run_scheduler_once()
         logger.info("scheduler pass: %s", summary.as_dict())
         # Third-party status pages are read in the same pass (before alerts, so a provider
-        # incident is announced in this pass rather than the next).
+        # incident is announced in this pass rather than the next). They get whatever the
+        # whole call's budget has left after the checks, less a reserve for sending alerts, so
+        # a slow pass can't push the call past the caller's timeout and drop the alerts.
         from providers.poller import run_provider_polls_once
 
-        providers = run_provider_polls_once()
+        remaining = settings.TRIGGER_BUDGET_SECONDS - (time.monotonic() - began)
+        provider_budget = max(
+            1.0, min(settings.PROVIDER_PASS_BUDGET_SECONDS, remaining - ALERT_RESERVE_SECONDS)
+        )
+        providers = run_provider_polls_once(time_budget=provider_budget)
         logger.info("provider pass: %s", providers.as_dict())
 
         # Alerts go out in the same trigger, so they arrive seconds after the check that

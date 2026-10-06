@@ -42,6 +42,10 @@ if not DEBUG and (SECRET_KEY.startswith("django-insecure") or len(SECRET_KEY) < 
     raise ImproperlyConfigured("Set DJANGO_SECRET_KEY to a random value of 32+ characters.")
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+# Render sets this to the service's own *.onrender.com name; allowing it means the platform's
+# health probe (and the default address) work even before a custom domain is listed above.
+if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
 
 
 # Application definition
@@ -74,6 +78,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Serves the admin's and the API docs' static files from the container (no CDN needed).
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -166,6 +172,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -274,8 +284,8 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/
 AUTH_REFRESH_COOKIE_NAME = "refresh_token"
 AUTH_REFRESH_COOKIE_PATH = "/api/v1/auth/"
 AUTH_REFRESH_COOKIE_SECURE = not DEBUG
-AUTH_REFRESH_COOKIE_SAMESITE = os.environ.get(
-    "AUTH_REFRESH_COOKIE_SAMESITE", "Strict" if DEBUG else "None"
+AUTH_REFRESH_COOKIE_SAMESITE = os.environ.get("AUTH_REFRESH_COOKIE_SAMESITE") or (
+    "Strict" if DEBUG else "None"
 )
 
 GITHUB_OAUTH_CLIENT_ID = os.environ.get("GITHUB_OAUTH_CLIENT_ID", "")
@@ -319,6 +329,9 @@ CHECK_WORKERS = int(os.environ.get("CHECK_WORKERS", "20"))
 CHECK_BATCH_SIZE = int(os.environ.get("CHECK_BATCH_SIZE", "100"))
 # Stop starting new checks after this long, so the trigger's HTTP request can finish.
 CHECK_PASS_BUDGET_SECONDS = int(os.environ.get("CHECK_PASS_BUDGET_SECONDS", "80"))
+# The whole scheduler trigger (checks, dependency reads, alerts, mail) aims to finish inside this,
+# comfortably under the GitHub Actions caller's 150 s and gunicorn's 170 s timeouts.
+TRIGGER_BUDGET_SECONDS = int(os.environ.get("TRIGGER_BUDGET_SECONDS", "110"))
 CHECK_RECHECK_DELAY_SECONDS = int(os.environ.get("CHECK_RECHECK_DELAY_SECONDS", "5"))
 CHECK_TCP_TIMEOUT = int(os.environ.get("CHECK_TCP_TIMEOUT", "10"))
 CHECK_USER_AGENT = "RootPulse/1.0 (+https://rootpulse.dev; uptime monitoring)"
@@ -386,6 +399,12 @@ PROVIDER_UNKNOWN_AFTER_FAILURES = 3  # unreadable this many times in a row = sta
 # An incident older than this when we first see it (or that is still "open" long after) isn't news.
 PROVIDER_NOTIFY_MAX_AGE_HOURS = 12
 
+# RootPulse is a single-owner product. A public deployment lets anyone create an account until
+# its owner has, and then should stop: set SIGNUPS_OPEN=false once your own account exists
+# (people with accounts, including you, still sign in). Otherwise strangers share your free-tier
+# database. Closed sign-up is silent for email (same answer, no message), so it reveals nothing.
+SIGNUPS_OPEN = env_bool("SIGNUPS_OPEN", True)
+
 # Passwordless sign-in (accounts/passwordless.py).
 EMAIL_CHALLENGE_TTL_SECONDS = 15 * 60
 EMAIL_CHALLENGE_RESEND_SECONDS = 60  # one email per address per minute
@@ -405,3 +424,35 @@ if not DEBUG:
     X_FRAME_OPTIONS = "DENY"
     # Deliberately not set (see HSTS above): the platform's domain isn't ours to commit to HTTPS.
     SILENCED_SYSTEM_CHECKS = ["security.W005", "security.W021"]
+
+
+# Logging and error tracking (docs/plan/09-deployment-runbook.md).
+# Everything goes to stdout, which is where Render (and `docker logs`) collect it. Request
+# bodies, query strings and tokens are never logged by the application itself.
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"plain": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+    "loggers": {
+        # Gunicorn writes its own access log; Django's would only repeat it.
+        "django.server": {"level": "WARNING"},
+    },
+}
+
+# Optional error tracking. Sentry's free plan is enough for one person; with no DSN this does
+# nothing, and the SDK is never imported.
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+if SENTRY_DSN and not DEBUG:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
+        release=os.environ.get("RENDER_GIT_COMMIT") or None,
+        send_default_pii=False,  # no cookies, no addresses, no user details
+        max_request_body_size="never",  # a body can hold a password or a webhook secret
+        traces_sample_rate=0,  # errors only; performance data would use the free quota fast
+    )

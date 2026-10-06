@@ -9,6 +9,9 @@ Status: **Draft, awaiting approval.** Do not begin implementation against this p
 5. [`04-security.md`](./04-security.md) — full security plan, SSRF deep dive
 6. [`05-testing-deployment-devex.md`](./05-testing-deployment-devex.md) — testing strategy, deployment architecture, local dev, git workflow
 7. [`06-roadmap.md`](./06-roadmap.md) — all 19 phases in full detail, complexity/risk, checkpoints, master roadmap
+8. [`07-security-review.md`](./07-security-review.md) — the Phase 16 security review
+9. [`08-qa-report.md`](./08-qa-report.md) — the Phase 17 QA report
+10. [`09-deployment-runbook.md`](./09-deployment-runbook.md) — taking it live (Phase 18): order of steps, settings, smoke test, rollback
 
 Frontend-specific plan: [`../../RootPulse-frontend/docs/plan/`](../../RootPulse-frontend/docs/plan/)
 

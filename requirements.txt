@@ -12,6 +12,8 @@ dnspython
 pywebpush
 reportlab
 gunicorn
+whitenoise
+sentry-sdk
 
 # Testing
 pytest

@@ -366,6 +366,8 @@
 | Definition of done | A real monitor, created by the real product owner, on the real product, checking a real site, alerting through a real channel |
 | Complexity | Medium (mechanically) | Risk | First-real-traffic surprises are normal — have the rollback plan (previous Render deploy, previous Vercel deployment) ready before cutover, not improvised during it |
 
+> **Status: deployment-ready; the go-live itself is yours.** See `09-deployment-runbook.md`. Done and tested: a production image (migrates on start, non-root, static files served, hardened gunicorn), a complete `render.yaml`, `scripts/preflight.py` (checks the production settings, printing no values), `scripts/smoke_test.py` (the post-deploy suite) with a CI job that runs it against the real container on Postgres, a time budget on the scheduler trigger, an off-switch for new accounts (`SIGNUPS_OPEN`), optional Sentry, an optional same-origin API proxy so the sign-in cookie works in every browser, and the rollback plan. Needs you, because it is your accounts, credentials and DNS: the Neon/Render/Vercel/Cloudflare/Resend accounts, every secret, the pushes to GitHub, the Telegram/Discord/Slack production apps, the one-time Telegram webhook, and then the real monitor and the real alert that are the definition of done.
+
 **Checkpoint:** RootPulse is monitoring itself, in production, for real.
 
 ---

@@ -51,6 +51,8 @@ def start(email: str, purpose: str) -> bool:
         return False
     if existing is not None and not existing.is_active:
         return False
+    if existing is None and not settings.SIGNUPS_OPEN:
+        return False  # sign-up is closed; answer exactly as for any other "no email sent"
 
     now = timezone.now()
     cooldown = now - timedelta(seconds=settings.EMAIL_CHALLENGE_RESEND_SECONDS)
@@ -105,6 +107,8 @@ def _finish(challenge: EmailChallenge) -> tuple[User, bool]:
     if user is None:
         if challenge.purpose != EmailChallenge.SIGNUP:
             raise InvalidChallenge  # account vanished between request and use
+        if not settings.SIGNUPS_OPEN:
+            raise InvalidChallenge  # sign-up was closed after this email went out
         user = User(username=uuid.uuid4().hex, email=challenge.email)
         user.set_unusable_password()
         user.save()

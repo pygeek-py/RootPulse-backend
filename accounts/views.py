@@ -289,6 +289,9 @@ class GitHubCallbackView(PublicAuthView):
                 user.github_id = profile.github_id
                 user.save(update_fields=["github_id"])
                 audit("github_linked", request, user)
+            elif not settings.SIGNUPS_OPEN:
+                audit("register_refused", request, provider="github")
+                return _login_redirect("signups_closed")
             else:
                 user = User(username=secrets.token_hex(16), email=profile.email)
                 user.github_id = profile.github_id

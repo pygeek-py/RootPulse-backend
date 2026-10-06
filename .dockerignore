@@ -7,8 +7,15 @@ docs/
 *.pdf
 db.sqlite3
 .env
+.env.*
 .pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 staticfiles/
-workers
+logs/
+*.log
+workers/
+tests/
+scripts/
+.claude/

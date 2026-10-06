@@ -1,8 +1,14 @@
-# Render Blueprint — see docs/plan/01-tech-stack.md for the reasoning
-# (Render's free tier has no always-on Background Worker/Cron Job, so
-# the scheduler is triggered externally by a GitHub Actions cron
-# workflow instead, added in Phase 6 once /internal/run-due-checks
-# exists — docs/plan/06-roadmap.md).
+# Render Blueprint for the RootPulse API. The full walkthrough, in order, is
+# docs/plan/09-deployment-runbook.md.
+#
+# Render's free tier has no always-on Background Worker or Cron Job, so the scheduler is not a
+# process here: a GitHub Actions cron (.github/workflows/scheduler.yml) calls the signed
+# /internal/run-due-checks/ endpoint every five minutes, which also keeps the free web service
+# from spinning down.
+#
+# `sync: false` means "ask me in the Render dashboard"; the value is never in this file.
+# Check the values you entered with: python scripts/preflight.py   (reads your environment, never
+# prints a secret).
 
 services:
   - type: web
@@ -11,44 +17,84 @@ services:
     dockerfilePath: ./Dockerfile
     plan: free
     healthCheckPath: /health/
+    # Deploys happen when you choose, after CI is green on main, not on every push.
+    autoDeployTrigger: checksPass
     envVars:
+      # --- Core ---------------------------------------------------------------------------
       - key: DJANGO_DEBUG
         value: "false"
-      - key: DJANGO_ALLOWED_HOSTS
-        value: rootpulse-api.onrender.com
       - key: DJANGO_SECRET_KEY
-        generateValue: true
+        generateValue: true # also signs sign-in tokens: rotating it signs everyone out
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false # your API's host(s), comma separated, e.g. api.example.com (the *.onrender.com name is allowed automatically)
+      - key: DJANGO_ADMIN_URL
+        sync: false # something unguessable, e.g. console-8f3k2/ (not "admin/")
       - key: DATABASE_URL
-        sync: false # set manually to the Neon connection string
+        sync: false # the PRODUCTION Neon connection string (a separate project from staging)
+      - key: NUM_PROXIES
+        value: "1" # Render's load balancer. Use "2" when the website proxies the API (the runbook)
+      - key: SIGNUPS_OPEN
+        value: "true" # create YOUR account, then change this to "false" (single-owner product)
+      - key: LOG_LEVEL
+        value: INFO
+      - key: SENTRY_DSN
+        sync: false # optional; error tracking on Sentry's free plan. Empty = off
+      # --- Where things live ---------------------------------------------------------------
+      - key: API_PUBLIC_URL
+        sync: false # this API's public https URL, no trailing slash
+      - key: FRONTEND_URL
+        sync: false # the website's public https URL (OAuth and email links point here)
       - key: CORS_ALLOWED_ORIGINS
-        sync: false # set to the Vercel frontend URL
+        sync: false # the website's origin, e.g. https://rootpulse.example.com (no wildcard)
+      - key: AUTH_REFRESH_COOKIE_SAMESITE
+        value: "None" # use "Lax" when the website proxies the API (see the runbook, "Cookies")
+      # --- Scheduler and probers -----------------------------------------------------------
+      - key: SCHEDULER_SHARED_SECRET
+        generateValue: true # copy into the GitHub Actions secret of the same name
       - key: PROBER_SHARED_SECRET
-        generateValue: true # copy this value into each Worker: `wrangler secret put PROBER_SHARED_SECRET`
+        generateValue: true # copy into each Worker: `wrangler secret put PROBER_SHARED_SECRET`
       - key: PROBER_URLS
         sync: false # name=https://worker-url,name=https://worker-url
-      - key: SCHEDULER_SHARED_SECRET
-        generateValue: true # copy this value into the SCHEDULER_SHARED_SECRET GitHub Actions secret
       - key: PRIMARY_REGION
         value: render
-      - key: RESEND_API_KEY
-        sync: false
+      # --- Email (sign-in codes, status page subscribers) -----------------------------------
+      # Render's free tier blocks outbound SMTP on port 587; Resend accepts 2587 (or 2465).
       - key: EMAIL_HOST
         value: smtp.resend.com
+      - key: EMAIL_PORT
+        value: "2587"
       - key: EMAIL_HOST_USER
         value: resend
       - key: EMAIL_HOST_PASSWORD
         sync: false # the Resend API key
       - key: DEFAULT_FROM_EMAIL
-        sync: false # e.g. RootPulse <login@yourdomain.com>, on a domain verified in Resend
-      - key: API_PUBLIC_URL
-        sync: false # this service's own public URL, e.g. https://rootpulse-api.onrender.com
-      - key: FRONTEND_URL
-        sync: false # the Vercel URL, e.g. https://rootpulse.vercel.app
-      - key: NUM_PROXIES
-        value: "1" # Render's load balancer: keeps per-IP rate limits honest
-      - key: GITHUB_OAUTH_REDIRECT_URI
-        sync: false # https://<api-host>/api/v1/auth/github/callback/
+        sync: false # RootPulse <login@yourdomain.com>, on a domain verified in Resend
+      # --- Sign-in with GitHub --------------------------------------------------------------
       - key: GITHUB_OAUTH_CLIENT_ID
         sync: false
       - key: GITHUB_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_OAUTH_REDIRECT_URI
+        sync: false # https://<api-host>/api/v1/auth/github/callback/
+      # --- Web push -------------------------------------------------------------------------
+      - key: VAPID_PRIVATE_KEY
+        sync: false # python manage.py generate_vapid_keys (make NEW ones for production)
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false # mailto:you@yourdomain.com
+      # --- One-click alert channels (each is optional) --------------------------------------
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false # a PRODUCTION bot from @BotFather, not the development one
+      - key: TELEGRAM_BOT_USERNAME
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        generateValue: true # then, once: `python manage.py telegram_webhook set` from your machine
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: SLACK_CLIENT_ID
+        sync: false
+      - key: SLACK_CLIENT_SECRET
         sync: false

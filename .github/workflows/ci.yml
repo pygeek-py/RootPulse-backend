@@ -77,6 +77,56 @@ jobs:
           DJANGO_ALLOWED_HOSTS: api.example.com
           DATABASE_URL: "sqlite:///:memory:"
 
+  container:
+    # Builds the real image, starts it in production mode against a real Postgres, and runs the
+    # post-deploy smoke test against it: migrations on start, static files, security headers,
+    # CORS, the closed and the signed scheduler trigger. What deploys is what was tested.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rootpulse
+          POSTGRES_USER: rootpulse
+          POSTGRES_PASSWORD: rootpulse
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rootpulse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -t rootpulse-api .
+      - name: Start it in production mode
+        run: |
+          docker run -d --name api --network host \
+            -e DJANGO_DEBUG=false \
+            -e DJANGO_SECRET_KEY=ci-0f5a1c7e9b3d4a6c8e2f1b0a9d8c7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d \
+            -e DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1 \
+            -e DJANGO_ADMIN_URL=console-ci/ \
+            -e DB_NAME=rootpulse -e DB_USER=rootpulse -e DB_PASSWORD=rootpulse \
+            -e DB_HOST=localhost -e DB_PORT=5432 \
+            -e CORS_ALLOWED_ORIGINS=https://app.example.com \
+            -e FRONTEND_URL=https://app.example.com \
+            -e API_PUBLIC_URL=https://api.example.com \
+            -e SCHEDULER_SHARED_SECRET=ci-scheduler-secret-ci-scheduler-secret \
+            -e PORT=8000 \
+            rootpulse-api
+      - name: Smoke test the running container
+        env:
+          SCHEDULER_SHARED_SECRET: ci-scheduler-secret-ci-scheduler-secret
+        run: |
+          pip install httpx
+          python scripts/smoke_test.py --api http://localhost:8000 \
+            --cors-origin https://app.example.com --forwarded-https
+      - name: The container is not root
+        run: test "$(docker exec api id -u)" != "0"
+      - name: Show the container's log if anything failed
+        if: failure()
+        run: docker logs api | tail -80
+
   prober-tests:
     # The Cloudflare Worker prober shares its SSRF rules and signing format with the API;
     # these tests run against the same fixtures (tests/fixtures) as the Python suite.
