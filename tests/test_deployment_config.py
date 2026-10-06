@@ -212,3 +212,14 @@ def test_a_blank_cookie_setting_falls_back_to_the_default(monkeypatch, value):
     monkeypatch.setenv("DJANGO_DEBUG", "true")
     spec.loader.exec_module(module)
     assert module.AUTH_REFRESH_COOKIE_SAMESITE == (value or "Strict")
+
+
+@pytest.mark.parametrize("name", ["scheduler", "rollups"])
+def test_the_cron_workflows_stay_quiet_until_their_secrets_exist(name):
+    """A fresh clone has no secrets; the cron must not fail (and email) every few minutes. But
+    a half-configured one (one secret, not both) is a mistake and must fail loudly."""
+    run = read(f".github/workflows/{name}.yml")
+    skip = run.index("are not set; skipping")
+    assert "exit 0" in run[skip : skip + 100]
+    assert '[ -z "${API_URL:-}" ] && [ -z "${SCHEDULER_SHARED_SECRET:-}" ]' in run
+    assert "must both be set" in run

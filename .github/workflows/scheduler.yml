@@ -36,8 +36,14 @@ jobs:
           SCHEDULER_SHARED_SECRET: ${{ secrets.SCHEDULER_SHARED_SECRET }}
         run: |
           set -euo pipefail
+          # Not set up yet (neither secret exists): do nothing, so a fresh clone or fork doesn't
+          # fail every few minutes. Half set up (only one of them) is a mistake, and fails.
+          if [ -z "${API_URL:-}" ] && [ -z "${SCHEDULER_SHARED_SECRET:-}" ]; then
+            echo "::notice::API_URL and SCHEDULER_SHARED_SECRET are not set; skipping."
+            exit 0
+          fi
           if [ -z "${API_URL:-}" ] || [ -z "${SCHEDULER_SHARED_SECRET:-}" ]; then
-            echo "API_URL and SCHEDULER_SHARED_SECRET must be set as repository secrets." >&2
+            echo "API_URL and SCHEDULER_SHARED_SECRET must both be set as repository secrets." >&2
             exit 1
           fi
 
