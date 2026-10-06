@@ -82,6 +82,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apikeys.ratelimit.RateLimitHeadersMiddleware",
+    "config.middleware.ApiSecurityHeadersMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -256,6 +257,10 @@ CORS_EXPOSE_HEADERS = ["Content-Disposition"]
 CORS_ALLOW_HEADERS = (*default_headers, "x-status-page-token")
 
 
+# Where the Django admin lives. Staff-only and passworded with Argon2, but a login form on a
+# well-known address is a target: set this to something unguessable in production.
+ADMIN_URL = os.environ.get("DJANGO_ADMIN_URL", "admin/").strip("/") + "/"
+
 # Auth (docs/plan/04-security.md #1, #7)
 
 # Where users land after OAuth and where password-reset links point.
@@ -387,4 +392,16 @@ EMAIL_CHALLENGE_RESEND_SECONDS = 60  # one email per address per minute
 EMAIL_CODE_MAX_ATTEMPTS = 5
 
 if not DEBUG:
+    # Behind Render's proxy: trust its word that the browser spoke HTTPS, then insist on it.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
+    SECURE_REDIRECT_EXEMPT = [r"^health/$"]  # the platform's own health probe speaks plain HTTP
+    # A year of "only ever talk to me over HTTPS". Not includeSubDomains/preload: this host is
+    # one of several under the platform's domain, and those aren't ours to commit.
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000"))
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
+    # Deliberately not set (see HSTS above): the platform's domain isn't ours to commit to HTTPS.
+    SILENCED_SYSTEM_CHECKS = ["security.W005", "security.W021"]

@@ -27,6 +27,8 @@ from django.db import connections, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from monitoring import target_validation as tv
+
 from .adapters import ADAPTERS, FeedError
 from .ingest import ingest, record_failure
 from .models import Provider
@@ -82,9 +84,24 @@ def fetch_json(client: httpx.Client, url: str) -> Any:
         raise FeedError("Not JSON") from exc
 
 
-def new_client() -> httpx.Client:
+def _vet_request(request: httpx.Request) -> None:
+    """Runs before every request, including each redirect hop: the host must resolve to public
+    addresses only. The catalogue's own hosts are trusted, but a redirect is chosen by whoever
+    answered, so a hop to an internal address is refused rather than fetched."""
+    try:
+        tv.resolve_public_ips(request.url.host)
+    except (tv.TargetRejected, tv.ResolutionFailed) as exc:
+        raise httpx.RequestError("Refused: not a public address", request=request) from exc
+
+
+def new_client(transport: httpx.BaseTransport | None = None) -> httpx.Client:
     return httpx.Client(
-        timeout=settings.PROVIDER_HTTP_TIMEOUT, follow_redirects=True, headers=HEADERS
+        transport=transport,
+        timeout=settings.PROVIDER_HTTP_TIMEOUT,
+        follow_redirects=True,
+        max_redirects=3,
+        headers=HEADERS,
+        event_hooks={"request": [_vet_request]},
     )
 
 

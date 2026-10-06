@@ -68,7 +68,7 @@ class DeploySourceSerializer(serializers.ModelSerializer):
         return obj.secret if getattr(obj, "reveal_secret", False) else None
 
     def validate_name(self, value: str) -> str:
-        value = value.strip()
+        value = " ".join(value.split())  # one line: names end up in email subjects and headers
         if not value:
             raise serializers.ValidationError("Give this connection a name.")
         return value

@@ -1,4 +1,4 @@
-Django>=5.1,<5.2
+Django>=5.2.17,<5.3
 djangorestframework
 drf-spectacular
 djangorestframework-simplejwt
@@ -18,6 +18,9 @@ pytest
 pytest-django
 pypdf
 factory_boy
+
+# Security
+pip-audit
 
 # Lint / format
 ruff

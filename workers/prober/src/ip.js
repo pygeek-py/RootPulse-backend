@@ -74,6 +74,7 @@ const V4_FORBIDDEN = [
   [[172, 16, 0, 0], 12], //      private
   [[192, 0, 0, 0], 24], //       IETF protocol assignments
   [[192, 0, 2, 0], 24], //       documentation
+  [[192, 88, 99, 0], 24], //     deprecated 6to4 relay anycast
   [[192, 168, 0, 0], 16], //     private
   [[198, 18, 0, 0], 15], //      benchmarking
   [[198, 51, 100, 0], 24], //    documentation
@@ -92,8 +93,12 @@ const startsWith = (bytes, prefix) => prefix.every((p, i) => bytes[i] === p);
 export function ipIsForbidden(ip) {
   if (ip.v === 4) return v4Forbidden(ip.bytes);
   const b = ip.bytes;
-  if (b.every((x) => x === 0)) return true; //                                  ::  unspecified
-  if (b.slice(0, 15).every((x) => x === 0) && b[15] === 1) return true; //     ::1 loopback
+  if (b.slice(0, 12).every((x) => x === 0)) return true; //                    ::/96 unspecified, loopback, IPv4-compatible
+  if (b.slice(0, 8).every((x) => x === 0) && b[8] === 0xff && b[9] === 0xff && b[10] === 0 && b[11] === 0) {
+    return true; //                                                              ::ffff:0:0:0/96 IPv4-translated
+  }
+  if (b[0] === 0xfe && (b[1] & 0xc0) === 0xc0) return true; //                  fec0::/10 deprecated site-local
+  if (b[0] === 0x5f && b[1] === 0) return true; //                              5f00::/16 segment-routing SIDs
   if (b[0] === 0xff) return true; //                                            multicast
   if ((b[0] & 0xfe) === 0xfc) return true; //                                   fc00::/7 unique local
   if (b[0] === 0xfe && (b[1] & 0xc0) === 0x80) return true; //                  fe80::/10 link-local

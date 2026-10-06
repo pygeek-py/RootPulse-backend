@@ -326,6 +326,8 @@
 | Definition of done | The SSRF defenses in `04-security.md` are verified against real attempted targets (a real internal address, a real DNS-rebinding domain set up for the test) in the staging environment |
 | Complexity | High (verification is slower than building) | Risk | This is the phase most tempting to rush — don't |
 
+> **Status: code-side built; deployed verification outstanding.** See `07-security-review.md`. Done: the whole-API security gate, a code review with fixes, dependency scans, hardened production settings and headers, the frontend review. Outstanding because it needs real infrastructure: the SSRF suite against real targets and a real rebinding domain in staging, prober isolation, rate-limit tuning on real traffic, Sentry alerting, and the `security-review` pass on the final diff. All are listed as a checklist in the review.
+
 **Checkpoint:** a genuine attempted SSRF against staging (pointed at staging's own internal address) is blocked and logged.
 
 ---

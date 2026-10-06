@@ -58,7 +58,7 @@ CATALOG: list[Entry] = [
     _sp("discord", "Discord", "Communications", "Chat and community platform", "https://discord.com", "https://discordstatus.com"),
     Entry("slack", "Slack", "Communications", "Team messaging", "https://slack.com", "https://slack-status.com", "https://slack-status.com", SLACK),
     _sp("openai", "OpenAI", "AI", "ChatGPT and the OpenAI API", "https://openai.com", "https://status.openai.com"),
-    _sp("anthropic", "Anthropic", "AI", "Claude and the Anthropic API", "https://www.anthropic.com", "https://status.anthropic.com"),
+    _sp("anthropic", "Anthropic", "AI", "Claude and the Anthropic API", "https://www.anthropic.com", "https://status.claude.com"),
 ]  # fmt: skip
 
 

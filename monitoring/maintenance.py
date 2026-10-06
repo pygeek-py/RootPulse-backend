@@ -47,7 +47,7 @@ class MaintenanceWindowSerializer(serializers.ModelSerializer):
         return "active" if obj.starts_at <= now else "upcoming"
 
     def validate_name(self, value: str) -> str:
-        value = value.strip()
+        value = " ".join(value.split())  # one line: names end up in email subjects and headers
         if not value:
             raise serializers.ValidationError("Give the window a name.")
         return value

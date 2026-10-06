@@ -335,3 +335,17 @@ The API the dashboard uses is the API scripts use; keys are only a different way
 **Reference.** The API serves its own reference, always in step with the code: Swagger UI at `/api/v1/docs/` and the OpenAPI schema at `/api/v1/schema/` (both public). The schema declares both sign-in schemes (`jwtAuth`, `apiKey`) and its description (`config/api_description.md`) covers authentication, scopes, rate limits, errors and pagination.
 
 Tests: 52 in `tests/test_api_keys.py`: the matrix from the security plan (valid works, revoked is rejected at once, a read key is rejected on a write), the key shown once and stored only as a hash, malformed headers, keys can't manage keys, ownership, `last_used_at`, rate-limit headers and limits, guessing throttled, and the published schema.
+
+## Security hardening (Phase 16)
+
+A deliberate review of Phases 0 to 15; the full write-up, with every finding, the fix and the test that pins it, is `docs/plan/07-security-review.md`.
+
+**The gate** (`tests/test_security_gate.py`) crawls the whole API, so a new endpoint is covered the day it exists: the routes that answer without signing in are exactly the reviewed list; every other operation in the published schema refuses an anonymous caller; a read-only API key is refused on every write; user B reaches none of user A's objects by any id through any endpoint; no endpoint answers junk with a 500; every API response carries `no-store`, a locked-down content policy and `nosniff`; and the production settings pass `manage.py check --deploy --fail-level WARNING`. The gate was proven able to fail by deliberately breaking an ownership check and the read-scope check.
+
+**What it found and fixed:** Django 5.1 had 8 known vulnerabilities (now Django 5.2 LTS, `pip-audit` clean); the SSRF validator relied on the system resolver to refuse `127.1`, `0x7f.0.0.1` and IPv4-compatible IPv6 spellings (now refused by the validator itself, in Python and in the Cloudflare Worker, from one shared fixture); the dependency poller followed redirects unchecked (each hop is now vetted); a newline in a monitor name made every email alert for it fail (names are one line, subjects too); production lacked HTTPS redirect, HSTS and secure cookies; the admin was at a well-known address (`DJANGO_ADMIN_URL`); the frontend sent no security headers (now a content policy and the standard set) and trusted server-validated links (`safeHref`).
+
+**What can only be verified once deployed** (SSRF against real internal targets and a real rebinding domain, prober isolation, rate limits under real traffic, Sentry alerting) is a checklist at the end of the review document.
+
+Run before every deploy: `pip-audit`, `python manage.py check --deploy`, the whole test suite.
+
+Tests: 30 in the gate, 43 in `tests/test_security_hardening.py` (one-line names, address spellings, provider redirects, mass assignment, forged tokens), plus the shared SSRF fixture run by both Python (147) and the Worker (26).

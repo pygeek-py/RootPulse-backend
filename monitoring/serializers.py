@@ -93,7 +93,7 @@ class MonitorSerializer(serializers.ModelSerializer):
         return f"{settings.API_PUBLIC_URL}/api/v1/heartbeat/{obj.heartbeat_token}/"
 
     def validate_name(self, value: str) -> str:
-        value = value.strip()
+        value = " ".join(value.split())  # one line: names end up in email subjects and headers
         if not value:
             raise serializers.ValidationError("Give the monitor a name.")
         return value

@@ -1,5 +1,6 @@
 """URL configuration for RootPulse. See docs/plan/02-database-and-api.md."""
 
+from django.conf import settings
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
@@ -14,7 +15,7 @@ def health(request):
 
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
     path("health/", health, name="health"),
     path("api/v1/auth/", include("accounts.urls")),
     path("api/v1/monitors/", include("monitoring.urls")),

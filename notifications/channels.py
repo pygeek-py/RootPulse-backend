@@ -119,7 +119,8 @@ class EmailChannel(Channel):
         return {"address": config.get("address", "")}
 
     def send(self, config, payload, delivery_id):
-        subject = f"[{payload['severity'].upper()}] {payload['title']}"
+        # One line whatever the title holds: a newline in a header makes Django refuse to send.
+        subject = " ".join(f"[{payload['severity'].upper()}] {payload['title']}".split())
         lines = [payload["title"], "", payload["summary"], ""]
         if payload["monitor"]["target"]:
             lines.append(f"Target: {payload['monitor']['target']}")

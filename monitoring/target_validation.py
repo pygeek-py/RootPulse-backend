@@ -46,6 +46,15 @@ BLOCKED_SUFFIXES = (
 _LABEL = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)$")
 _NAT64 = ipaddress.IPv6Network("64:ff9b::/96")
 _SIX_TO_FOUR = ipaddress.IPv6Network("2002::/16")
+# Ranges Python's `is_global` calls public but nothing legitimate lives in. Listed here, and
+# mirrored in the prober's ip.js, so an odd spelling of a private address can't slip through.
+_EXTRA_FORBIDDEN = (
+    ipaddress.IPv6Network("::/96"),  # ::, ::1 and the deprecated IPv4-compatible forms
+    ipaddress.IPv6Network("::ffff:0:0:0/96"),  # IPv4-translated (SIIT)
+    ipaddress.IPv6Network("fec0::/10"),  # deprecated site-local
+    ipaddress.IPv6Network("5f00::/16"),  # segment-routing SIDs
+    ipaddress.IPv4Network("192.88.99.0/24"),  # deprecated 6to4 relay anycast
+)
 
 
 class TargetRejected(ValueError):
@@ -77,7 +86,13 @@ def ip_is_forbidden(ip: IPAddress) -> bool:
         inner = _embedded_ipv4(ip)
         if inner is not None:
             candidates.append(inner)
-    return any(not c.is_global or c.is_multicast or c.is_unspecified for c in candidates)
+    return any(
+        not c.is_global
+        or c.is_multicast
+        or c.is_unspecified
+        or any(c.version == net.version and c in net for net in _EXTRA_FORBIDDEN)
+        for c in candidates
+    )
 
 
 # --- host syntax ----------------------------------------------------------
@@ -104,7 +119,12 @@ def normalize_hostname(raw: str) -> str:
         host = host.encode("idna").decode("ascii")
     except UnicodeError as exc:
         raise TargetRejected("That isn't a valid host name.") from exc
-    if len(host) > 253 or not all(_LABEL.match(label) for label in host.split(".")):
+    labels = host.split(".")
+    if len(host) > 253 or not all(_LABEL.match(label) for label in labels):
+        raise TargetRejected("That isn't a valid host name.")
+    # No real top-level domain is all digits or "0x...", but those are exactly how 127.1,
+    # 0x7f.0.0.1 and 0177.0.0.1 spell loopback. Refuse them rather than rely on the resolver.
+    if labels[-1].isdigit() or labels[-1].startswith("0x"):
         raise TargetRejected("That isn't a valid host name.")
     return host
 
