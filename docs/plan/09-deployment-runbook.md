@@ -40,6 +40,8 @@ Each step says how to know it worked.
 
 ### 1. Push the code
 
+**Decide the backend repository's visibility first** (see the GitHub Actions row under "Free-tier limits"): the 5-minute scheduler only fits GitHub's free minutes in a public repository. The code holds no secrets (the history was scanned; `.env` files are ignored), and security does not depend on the code being hidden, but making it public is your decision.
+
 Create the two GitHub repositories (backend, frontend) and push. Nothing is pushed yet. CI runs on the first push; wait for it to go green before deploying anything: it builds the image, starts it in production mode on Postgres and smoke-tests it.
 
 ### 2. Production database (Neon)
@@ -148,7 +150,7 @@ Finally, the definition of done: stop the thing you monitor (or monitor a URL yo
 | --- | --- | --- |
 | Render free web service | 750 h/month, sleeps after 15 min idle, ~512 MB RAM, no shell | One always-on service only; the 5-minute cron keeps it awake; use `manage.py` commands from your machine |
 | Neon free | 0.5 GB, limited connections, compute pauses when idle | Retention (90 days) and rollups keep data small; the cron keeps compute warm |
-| GitHub Actions | cron minimum 5 minutes, delays under load, disabled after 60 days idle | Checks can run a few minutes late; keep the repository active |
+| GitHub Actions | **private repos: 2,000 minutes/month; public repos: unlimited.** Cron minimum 5 minutes, delays under load, disabled after 60 days idle | The scheduler runs 288 times a day and every run is billed as at least a minute (about 8,600 minutes a month), so on a private repository the free minutes are gone in about a week. The repository that holds the scheduler workflow must be **public** (or hold only that workflow, in a separate small public repository). Keep the repository active |
 | Vercel Hobby | personal, non-commercial use; request and bandwidth limits | Fine for a personal tool; API calls pass through it (the proxy) |
 | Cloudflare Workers free | 100,000 requests/day | Probers are only called for a failing monitor; ample |
 | Resend free | small daily/monthly email caps | Sign-in codes and subscriber mail only |
