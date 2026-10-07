@@ -18,6 +18,7 @@ sentry-sdk
 # Testing
 pytest
 pytest-django
+pytest-cov
 pypdf
 factory_boy
 
