@@ -21,6 +21,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .models import EmailChallenge, User
+from .timezones import is_valid_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +98,7 @@ def start(email: str, purpose: str) -> bool:
     return True
 
 
-def _finish(challenge: EmailChallenge) -> tuple[User, bool]:
+def _finish(challenge: EmailChallenge, browser_timezone: str | None) -> tuple[User, bool]:
     """Mark consumed and return (user, created), creating the user for a sign-up."""
     challenge.consumed_at = timezone.now()
     challenge.save(update_fields=["consumed_at"])
@@ -110,6 +111,8 @@ def _finish(challenge: EmailChallenge) -> tuple[User, bool]:
         if not settings.SIGNUPS_OPEN:
             raise InvalidChallenge  # sign-up was closed after this email went out
         user = User(username=uuid.uuid4().hex, email=challenge.email)
+        if browser_timezone and is_valid_timezone(browser_timezone):
+            user.timezone = browser_timezone
         user.set_unusable_password()
         user.save()
         created = True
@@ -118,7 +121,7 @@ def _finish(challenge: EmailChallenge) -> tuple[User, bool]:
     return user, created
 
 
-def verify_link(token: str) -> tuple[User, bool]:
+def verify_link(token: str, browser_timezone: str | None = None) -> tuple[User, bool]:
     with transaction.atomic():
         challenge = (
             EmailChallenge.objects.select_for_update()
@@ -129,10 +132,10 @@ def verify_link(token: str) -> tuple[User, bool]:
         )
         if challenge is None:
             raise InvalidChallenge
-        return _finish(challenge)
+        return _finish(challenge, browser_timezone)
 
 
-def verify_code(email: str, code: str) -> tuple[User, bool]:
+def verify_code(email: str, code: str, browser_timezone: str | None = None) -> tuple[User, bool]:
     with transaction.atomic():
         challenge = (
             EmailChallenge.objects.select_for_update()
@@ -143,7 +146,7 @@ def verify_code(email: str, code: str) -> tuple[User, bool]:
         if challenge is None or challenge.failed_attempts >= settings.EMAIL_CODE_MAX_ATTEMPTS:
             raise InvalidChallenge
         if hmac.compare_digest(challenge.code_hash, _code_digest(email, code)):
-            return _finish(challenge)
+            return _finish(challenge, browser_timezone)
         challenge.failed_attempts += 1
         challenge.save(update_fields=["failed_attempts"])
     # Raised after the block so the attempt count is committed, not rolled back.

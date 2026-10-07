@@ -69,6 +69,46 @@ class TestSignUp:
         assert not mail.outbox
 
 
+class TestSignUpTimeZone:
+    def test_a_valid_browser_time_zone_becomes_the_new_accounts_time_zone(self, api):
+        start(api, REGISTER, "new@example.com")
+        token, _ = emailed_credentials()
+
+        resp = api.post(VERIFY, {"token": token, "timezone": "Europe/Paris"}, format="json")
+
+        assert resp.status_code == 200
+        assert User.objects.get().timezone == "Europe/Paris"
+
+    def test_an_unrecognized_time_zone_is_ignored_rather_than_failing_the_sign_up(self, api):
+        start(api, REGISTER, "new@example.com")
+        token, _ = emailed_credentials()
+
+        resp = api.post(VERIFY, {"token": token, "timezone": "Not/AZone"}, format="json")
+
+        assert resp.status_code == 200
+        assert User.objects.get().timezone == "UTC"
+
+    def test_no_time_zone_at_all_still_defaults_to_utc(self, api):
+        start(api, REGISTER, "new@example.com")
+        token, _ = emailed_credentials()
+
+        resp = api.post(VERIFY, {"token": token}, format="json")
+
+        assert resp.status_code == 200
+        assert User.objects.get().timezone == "UTC"
+
+    def test_logging_in_does_not_let_a_time_zone_override_an_existing_account(self, api, make_user):
+        existing = make_user(email="has-a-zone@example.com", timezone="Asia/Tokyo")
+        start(api, LOGIN, existing.email)
+        token, _ = emailed_credentials()
+
+        resp = api.post(VERIFY, {"token": token, "timezone": "Europe/Paris"}, format="json")
+
+        assert resp.status_code == 200
+        existing.refresh_from_db()
+        assert existing.timezone == "Asia/Tokyo"
+
+
 class TestLogin:
     def test_existing_account_gets_an_email_and_can_sign_in(self, api, user):
         assert start(api, LOGIN, user.email).status_code == 204

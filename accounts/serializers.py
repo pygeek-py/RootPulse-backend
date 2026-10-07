@@ -1,9 +1,8 @@
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-
 from rest_framework import serializers
 
 from . import onboarding
 from .models import AuditLog, User
+from .timezones import is_valid_timezone
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -24,10 +23,8 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         fields = ["timezone"]
 
     def validate_timezone(self, value: str) -> str:
-        try:
-            ZoneInfo(value)
-        except (ZoneInfoNotFoundError, ValueError) as exc:
-            raise serializers.ValidationError("Unknown time zone.") from exc
+        if not is_valid_timezone(value):
+            raise serializers.ValidationError("Unknown time zone.")
         return value
 
 
@@ -41,13 +38,21 @@ class EmailStartSerializer(serializers.Serializer):
 
 
 class VerifySerializer(serializers.Serializer):
-    """Either the emailed link's `token`, or the `email` + 6-digit `code`."""
+    """Either the emailed link's `token`, or the `email` + 6-digit `code`.
+
+    `timezone` is the browser's own IANA zone, offered only when this verify
+    creates a brand new account (see `passwordless._finish`); an invalid or
+    missing value just leaves the account on the model's "UTC" default rather
+    than failing the sign-up, since this is the one piece of this request
+    that isn't essential to it.
+    """
 
     token = serializers.CharField(max_length=256, required=False)
     email = serializers.EmailField(max_length=254, required=False)
     code = serializers.RegexField(
         r"^\d{6}$", required=False, error_messages={"invalid": "Enter the 6-digit code."}
     )
+    timezone = serializers.CharField(max_length=64, required=False, allow_blank=True)
 
     def validate_email(self, value: str) -> str:
         return value.strip().lower()

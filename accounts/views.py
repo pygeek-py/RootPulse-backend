@@ -33,8 +33,10 @@ from .services import (
     require_trusted_origin,
     set_refresh_cookie,
 )
+from .timezones import is_valid_timezone
 
 GITHUB_STATE_COOKIE = "gh_oauth_state"
+GITHUB_TZ_COOKIE = "gh_oauth_tz"
 GITHUB_STATE_PATH = "/api/v1/auth/github/"
 
 
@@ -106,11 +108,14 @@ class VerifyView(PublicAuthView):
         serializer = VerifySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        browser_timezone = data.get("timezone") or None
         try:
             if data.get("token"):
-                user, created = passwordless.verify_link(data["token"])
+                user, created = passwordless.verify_link(data["token"], browser_timezone)
             else:
-                user, created = passwordless.verify_code(data["email"], data["code"])
+                user, created = passwordless.verify_code(
+                    data["email"], data["code"], browser_timezone
+                )
         except passwordless.InvalidChallenge:
             audit("email_verify_failed", request)
             return Response(
@@ -259,6 +264,19 @@ class GitHubRedirectView(PublicAuthView):
             httponly=True,
             samesite="Lax",  # GitHub returns via a cross-site top-level GET
         )
+        # The browser's own IANA zone, carried across GitHub's redirect round trip the same
+        # way `state` is, so a brand new account can start on it instead of UTC.
+        browser_timezone = request.query_params.get("tz", "")
+        if browser_timezone and is_valid_timezone(browser_timezone):
+            response.set_cookie(
+                GITHUB_TZ_COOKIE,
+                browser_timezone,
+                max_age=600,
+                path=GITHUB_STATE_PATH,
+                secure=settings.AUTH_REFRESH_COOKIE_SECURE,
+                httponly=True,
+                samesite="Lax",
+            )
         return response
 
 
@@ -295,6 +313,9 @@ class GitHubCallbackView(PublicAuthView):
             else:
                 user = User(username=secrets.token_hex(16), email=profile.email)
                 user.github_id = profile.github_id
+                browser_timezone = request.COOKIES.get(GITHUB_TZ_COOKIE, "")
+                if browser_timezone and is_valid_timezone(browser_timezone):
+                    user.timezone = browser_timezone
                 user.set_unusable_password()
                 user.save()
                 audit("register", request, user, provider="github")
@@ -307,4 +328,5 @@ class GitHubCallbackView(PublicAuthView):
         response = HttpResponseRedirect(f"{settings.FRONTEND_URL}/auth/callback")
         set_refresh_cookie(response, refresh)
         response.delete_cookie(GITHUB_STATE_COOKIE, path=GITHUB_STATE_PATH)
+        response.delete_cookie(GITHUB_TZ_COOKIE, path=GITHUB_STATE_PATH)
         return response

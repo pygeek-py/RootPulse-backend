@@ -32,8 +32,8 @@ def fake_github(monkeypatch, *, token="gho_token", user_id=777, emails=None, tok
     )
 
 
-def start_flow(api) -> str:
-    resp = api.get(REDIRECT)
+def start_flow(api, *, tz: str | None = None) -> str:
+    resp = api.get(REDIRECT, {"tz": tz} if tz else {})
     return resp.cookies["gh_oauth_state"].value
 
 
@@ -57,6 +57,21 @@ class TestRedirect:
         resp = api.get(REDIRECT)
         assert resp.status_code == 302
         assert resp["Location"] == f"{FRONTEND}/login?error=github_not_configured"
+
+    def test_a_valid_tz_query_param_sets_a_time_zone_cookie(self, api):
+        resp = api.get(REDIRECT, {"tz": "Europe/Paris"})
+        cookie = resp.cookies["gh_oauth_tz"]
+        assert cookie.value == "Europe/Paris"
+        assert cookie["httponly"]
+        assert cookie["samesite"] == "Lax"
+
+    def test_an_unrecognized_tz_query_param_sets_no_cookie(self, api):
+        resp = api.get(REDIRECT, {"tz": "Not/AZone"})
+        assert "gh_oauth_tz" not in resp.cookies
+
+    def test_no_tz_query_param_sets_no_cookie(self, api):
+        resp = api.get(REDIRECT)
+        assert "gh_oauth_tz" not in resp.cookies
 
 
 class TestCallback:
@@ -87,6 +102,26 @@ class TestCallback:
         assert existing.github_id == "777"
         assert User.objects.count() == 1
         assert AuditLog.objects.filter(action="github_linked", user=existing).exists()
+
+    def test_a_new_account_starts_on_the_browsers_time_zone(self, api, monkeypatch):
+        fake_github(monkeypatch)
+        state = start_flow(api, tz="Asia/Tokyo")
+
+        api.get(CALLBACK, {"code": "abc", "state": state})
+
+        assert User.objects.get(github_id="777").timezone == "Asia/Tokyo"
+
+    def test_linking_to_an_existing_account_does_not_override_its_time_zone(
+        self, api, make_user, monkeypatch
+    ):
+        existing = make_user("octo@example.com", timezone="Asia/Tokyo")
+        fake_github(monkeypatch)
+        state = start_flow(api, tz="Europe/Paris")
+
+        api.get(CALLBACK, {"code": "abc", "state": state})
+
+        existing.refresh_from_db()
+        assert existing.timezone == "Asia/Tokyo"
 
     def test_an_existing_github_id_wins_even_if_the_email_changed(
         self, api, make_user, monkeypatch
