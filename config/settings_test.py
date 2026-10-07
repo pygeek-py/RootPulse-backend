@@ -29,6 +29,12 @@ EMAIL_CHALLENGE_RESEND_SECONDS = 0
 # Engine: run checks inline, never pause, and never talk to real probers.
 CHECK_WORKERS = 1
 STATUS_PAGE_MAIL_WORKERS = 1
+# claim_due() locks rows with SELECT ... FOR UPDATE inside an atomic block that, in a test, is a
+# savepoint rather than a real commit: the locks outlive it for the rest of the test. A worker
+# pool on its own connections would then block forever on those same rows (and did, in CI on
+# Postgres, whenever the seeded provider catalogue had something due) — so provider polling runs
+# on the test's own connection too, same as the engine and the status page mail above.
+PROVIDER_WORKERS = 1
 CHECK_RECHECK_DELAY_SECONDS = 0
 PROBER_URLS = ""
 PROBER_SHARED_SECRET = ""
