@@ -377,5 +377,6 @@ The full, ordered walkthrough (accounts, settings, the cookie decision, the Tele
 - **Check before you deploy.** `python scripts/preflight.py --env-file prod.env` (add `--proxied` if the website proxies the API) reports mistakes by setting *name*, never printing a value. It runs offline.
 - **Check after you deploy.** `python scripts/smoke_test.py --api https://<api> --site https://<site>` (with `SCHEDULER_SHARED_SECRET` set, it also runs one real scheduler pass). It reads and refuses things; it creates and deletes nothing.
 - **One trigger, one budget.** The scheduler call does checks, dependency reads, alerts and subscriber mail inside `TRIGGER_BUDGET_SECONDS` (110 s), under the caller's 150 s and gunicorn's 170 s. The dependency reads shrink first when checks are slow; alerts always run.
+- **What calls the trigger.** A Cloudflare Worker (`workers/scheduler/`) with its own Cron Triggers, not GitHub Actions' `schedule` trigger — that one can be delayed by hours under load, which isn't close enough to five minutes for a monitoring product. The GitHub workflows stay as a harmless backup.
 - **Single owner.** `SIGNUPS_OPEN=false` stops new accounts (email and GitHub) once yours exists; existing accounts still sign in.
 - **Errors.** `SENTRY_DSN` (optional) turns on error tracking with no cookies, addresses or request bodies sent. Logs go to stdout.

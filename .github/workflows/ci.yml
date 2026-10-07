@@ -156,6 +156,20 @@ jobs:
           node-version: "24"
       - run: npm test
 
+  scheduler-worker-tests:
+    # The Cloudflare Worker that replaced GitHub Actions' unreliable `schedule` trigger. Its
+    # signing code is checked against the same fixture the API and prober use.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers/scheduler
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm test
+
   live:
     # The checks against real DNS, TLS, HTTP and RDAP, and every provider's real status feed.
     # Nightly and on demand rather than on every push: it needs the internet and is slow.

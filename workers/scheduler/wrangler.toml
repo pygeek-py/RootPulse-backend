@@ -1,0 +1,17 @@
+# Replaces GitHub Actions' `schedule` trigger (unreliable at a five-minute interval in practice —
+# see src/index.js's top comment and README.md). Deploy with: npx wrangler deploy
+name = "rootpulse-scheduler"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[triggers]
+# Must match the keys of CRON_PATHS in src/index.js exactly.
+crons = ["*/5 * * * *", "7 * * * *"]
+
+[vars]
+# This API's own public https address, no trailing slash.
+API_PUBLIC_URL = "https://your-api.onrender.com"
+
+# The shared secret is NOT stored here (same value as SCHEDULER_SHARED_SECRET on Render). Set it
+# with:
+#   npx wrangler secret put SCHEDULER_SHARED_SECRET

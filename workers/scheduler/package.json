@@ -1,0 +1,15 @@
+{
+  "name": "rootpulse-scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cron trigger that calls RootPulse's signed scheduler endpoints, run as a Cloudflare Worker.",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

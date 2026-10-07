@@ -12,7 +12,7 @@ Read with `01-tech-stack.md` (why these hosts), `07-security-review.md` and `08-
 | `render.yaml`: every setting the API reads, with the secrets left for you to fill in | Fill the secrets in (Render dashboard, Vercel, GitHub, `wrangler secret put`) |
 | `scripts/preflight.py`: checks your production settings for mistakes before you deploy, printing no values | Push the repositories to GitHub (nothing has been pushed yet) |
 | `scripts/smoke_test.py`: checks a live deployment, and the CI job that runs it against the real container | A custom domain, if you want one (it is the one thing here that costs money; see "Addresses") |
-| The scheduler's GitHub Actions workflows, and a time budget so one trigger can't overrun its caller | Deploy the Cloudflare Workers, register the Telegram webhook |
+| The scheduler trigger itself: a Cloudflare Worker (`workers/scheduler/`) plus the GitHub Actions workflows as a backup, and a time budget so one call can't overrun its caller | Deploy the Cloudflare Workers, register the Telegram webhook |
 | The website-proxies-the-API setup so the sign-in cookie works in every browser; an off-switch for new accounts | Run the smoke test against production, then create the first real monitor |
 
 ## Before anything: the four decisions
@@ -83,11 +83,11 @@ Import the frontend repository. Environment variables (add them **before** the f
 
 Open the site, register with your email, and sign in. Then on Render set `SIGNUPS_OPEN=false` and redeploy. Check: a second browser can still sign in as you, and "Sign up" with another address sends nothing.
 
-### 7. The scheduler (GitHub Actions)
+### 7. The scheduler (Cloudflare Worker, recommended — GitHub Actions as a backup)
 
-In the **backend** repository: Settings, Secrets and variables, Actions, add `API_URL` (the API's address, no trailing slash) and `SCHEDULER_SHARED_SECRET` (the same value as on Render). The workflows `scheduler.yml` (every 5 minutes) and `rollups.yml` (hourly) are already in the repository: run **Scheduler** once by hand (Actions tab, Run workflow). Check: it goes green and its log prints a summary like `{"claimed": 0, ...}`. GitHub may run scheduled jobs a few minutes late, and disables them after 60 days with no repository activity (re-enable them if that happens).
+GitHub Actions' `schedule` trigger does not reliably fire every five minutes in practice: under load GitHub can delay a scheduled run by hours, which shows up as monitors barely getting checked. Use `workers/scheduler/` instead: a Cloudflare Worker with its own Cron Triggers, calling the same signed endpoints. Follow `workers/scheduler/README.md`: `npm install`, `npx wrangler login`, set `API_PUBLIC_URL` in its `wrangler.toml`, `npx wrangler secret put SCHEDULER_SHARED_SECRET` (the same value as Render's), then `npx wrangler deploy`. Check: the Worker's Logs (or `npx wrangler tail`) show an invocation within five minutes, and a monitor's "Next check" starts moving.
 
-One pass does everything: checks, dependency (status feed) reads, alerts, subscriber mail. It is capped at about 110 s (`TRIGGER_BUDGET_SECONDS`), inside the workflow's 150 s limit and gunicorn's 170 s.
+Also set up the GitHub side as a backup (harmless to run both — see "table is the queue" in `monitoring/engine.py`): in the backend repository, Settings, Secrets and variables, Actions, add `API_URL` (this API's address, no trailing slash) and `SCHEDULER_SHARED_SECRET` (the same value). Once the Worker has been running reliably for a few days, you can remove the `schedule:` block from `.github/workflows/scheduler.yml` and `rollups.yml` (keep `workflow_dispatch:` for a manual run) to stop the duplicate calls.
 
 ### 8. The Cloudflare probers (optional, recommended)
 
