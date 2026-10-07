@@ -53,7 +53,22 @@ jobs:
       - run: python manage.py makemigrations --check --dry-run
       # Everything, with branch coverage. The threshold is a floor that catches a forgotten file,
       # not a target: the report is read for gaps (docs/plan/08-qa-report.md).
-      - run: python -m pytest --cov --cov-report=term --cov-fail-under=95
+      # The run's Summary page (on GitHub, no login needed to read it) lists every failing test and
+      # the coverage total, so a failure can be read without opening the raw log.
+      - name: Test
+        id: test
+        run: |
+          set +e
+          python -m pytest --cov --cov-report=term --cov-fail-under=95 -rfE -p no:cacheprovider 2>&1 | tee pytest.log
+          status=${PIPESTATUS[0]}
+          {
+            echo "## Backend tests"
+            echo ""
+            echo '```'
+            grep -E "^(FAILED|ERROR) |^TOTAL|Required test coverage|[0-9]+ (passed|failed)" pytest.log | head -60
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
       # Every migration can be undone and redone, on real Postgres, in a scratch database.
       - name: Migration rollback on Postgres
         run: |
