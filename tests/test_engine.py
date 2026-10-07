@@ -19,6 +19,11 @@ DOWN = r.CheckResult(
 UNSURE = r.CheckResult.inconclusive(r.BLOCKED_TARGET)
 
 
+def due_original(monitor, claimed):
+    """The due time claim_due recorded before moving it, for a clearer assertion above."""
+    return claimed[monitor.id]
+
+
 def make(user, name="m", **kwargs):
     fields = {
         "type": "http",
@@ -52,17 +57,62 @@ def run(runner, **kwargs):
 
 class TestClaiming:
     def test_only_due_monitors_are_claimed_and_pushed_one_interval_ahead(self, user):
-        due = make(user, "due")
-        later = make(user, "later", next_check_at=timezone.now() + timedelta(hours=1))
         now = timezone.now()
+        due = make(user, "due", next_check_at=now - timedelta(seconds=1))
+        later = make(user, "later", next_check_at=now + timedelta(hours=1))
 
         claimed, skipped = claim_due(now, 100)
 
         assert list(claimed) == [due.id] and skipped == 0
         due.refresh_from_db()
-        assert due.next_check_at == now + timedelta(seconds=300)
+        assert due.next_check_at == due_original(due, claimed) + timedelta(seconds=300)
         later.refresh_from_db()
         assert later.next_check_at > now + timedelta(minutes=59)
+
+    def test_claimed_exactly_on_time_moves_forward_by_exactly_one_interval(self, user):
+        """The common case: picked up with no delay at all. The old and new behaviour agree
+        here — `now` and the monitor's own due time are the same instant."""
+        now = timezone.now()
+        due = make(user, "due", next_check_at=now)
+
+        claim_due(now, 100)
+
+        due.refresh_from_db()
+        assert due.next_check_at == now + timedelta(seconds=300)
+
+    def test_a_pass_that_runs_late_does_not_push_a_monitor_past_the_very_next_tick(self, user):
+        """The bug this guards: a 5-minute monitor, checked by a trigger that also fires every
+        5 minutes, must not have its next check pushed to +5 minutes from whenever the *late*
+        pass happened to notice it — that would land past the very next tick, so it would only
+        be picked up a full tick later (effectively every 10 minutes, not 5). A late pickup
+        should still land on the monitor's own original grid."""
+        interval = timedelta(seconds=300)
+        originally_due_at = timezone.now() - timedelta(seconds=1)
+        monitor = make(user, "late", next_check_at=originally_due_at)
+        late_now = originally_due_at + timedelta(seconds=58)  # the trigger arrived 58s late
+
+        claim_due(late_now, 100)
+
+        monitor.refresh_from_db()
+        assert monitor.next_check_at == originally_due_at + interval
+        # And the very next tick, five minutes after the ORIGINAL schedule, finds it due again —
+        # it has not silently become a ten-minute monitor.
+        next_tick = originally_due_at + interval
+        assert monitor.next_check_at <= next_tick
+
+    def test_a_monitor_overdue_by_several_intervals_catches_up_without_a_burst(self, user):
+        """The scheduler was down for a while, or a monitor just resumed: it must not schedule
+        dozens of immediate back-to-back checks to "catch up" on every missed slot."""
+        interval = timedelta(seconds=300)
+        originally_due_at = timezone.now() - timedelta(hours=3)  # ~36 missed intervals
+        monitor = make(user, "stale", next_check_at=originally_due_at)
+        now = timezone.now()
+
+        claim_due(now, 100)
+
+        monitor.refresh_from_db()
+        assert monitor.next_check_at > now  # not due again immediately
+        assert monitor.next_check_at <= now + interval  # but not pushed needlessly far out either
 
     def test_a_second_pass_does_not_claim_what_the_first_took(self, user):
         make(user)
@@ -162,12 +212,12 @@ class TestExecution:
         assert not check.confirmation
         assert (summary.claimed, summary.checked, summary.up) == (1, 1, 1)
 
-    def test_next_check_is_one_interval_after_the_claim(self, user):
-        monitor = make(user, interval_seconds=600)
-        before = timezone.now()
+    def test_next_check_is_one_interval_after_the_monitors_own_due_time(self, user):
+        due_at = timezone.now() - timedelta(seconds=1)
+        monitor = make(user, interval_seconds=600, next_check_at=due_at)
         run(script(UP))
         monitor.refresh_from_db()
-        assert monitor.next_check_at >= before + timedelta(seconds=600)
+        assert monitor.next_check_at == due_at + timedelta(seconds=600)
 
     def test_a_confirmed_failure_marks_it_down(self, user):
         monitor = make(user, status="up")

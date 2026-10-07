@@ -67,9 +67,18 @@ class PassSummary:
 def claim_due(now: datetime, batch_size: int) -> tuple[dict, int]:
     """Atomically claim up to `batch_size` due monitors.
 
-    Each claimed monitor's `next_check_at` is pushed to now + its interval
-    *inside the lock*, so a concurrent or retried pass sees it as not due. The
-    network calls then happen outside the transaction, never holding a lock.
+    Each claimed monitor's `next_check_at` is pushed forward *inside the lock*, so a concurrent
+    or retried pass sees it as not due. The network calls then happen outside the transaction,
+    never holding a lock.
+
+    The new time is anchored to the monitor's *own* schedule (its old `next_check_at`), not to
+    `now`: a pass that notices a monitor a little late — a sleeping host waking up, a slow
+    trigger — must not push every later check back by the same amount. With a 5-minute interval
+    checked by a 5-minute external trigger, "late" by even a few seconds pushes `now + interval`
+    past the very next tick, so the monitor is only picked up a whole tick later than it should
+    be — a 5-minute monitor quietly running every 10 minutes. Anchoring to the old schedule and
+    advancing by whole intervals keeps it on its original grid instead, catching up without
+    drifting when a monitor was overdue by more than one interval (the scheduler was down, say).
 
     Returns ({monitor_id: original next_check_at}, number skipped for maintenance).
     """
@@ -92,7 +101,9 @@ def claim_due(now: datetime, batch_size: int) -> tuple[dict, int]:
                 skipped += 1
             else:
                 claimed[monitor.id] = monitor.next_check_at
-                monitor.next_check_at = now + timedelta(seconds=monitor.interval_seconds)
+                interval = timedelta(seconds=monitor.interval_seconds)
+                periods = (now - monitor.next_check_at) // interval + 1
+                monitor.next_check_at = monitor.next_check_at + periods * interval
             monitor.save(update_fields=["next_check_at"])
     return claimed, skipped
 
